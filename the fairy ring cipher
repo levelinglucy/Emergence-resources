@@ -1,0 +1,190 @@
+"""
+maya-build-2026-10-31.py: the fairy ring cipher.
+
+A field at night. A single spore (the bright dot) sends a thread of mycelium
+wandering across it. Every ring of mushrooms it reaches is one letter:
+count the mushrooms, and that count is the letter's place in the alphabet
+(1 = A, 2 = B ... 26 = Z). A bare ring with no mushrooms is a gap between words.
+Follow the thread from the spore to read them in order.
+
+The background is a Gray-Scott reaction-diffusion run, the same maths Turing
+used for spots and stripes, seeded where the rings sit, so the ground looks
+like it is being eaten outward.
+
+Usage:
+  python3 maya-build-2026-10-31.py                 # the default hidden message
+  python3 maya-build-2026-10-31.py "your words"    # encode your own
+"""
+import base64
+import math
+import random
+import sys
+
+import numpy as np
+from PIL import Image, ImageDraw, ImageFilter, ImageFont
+
+# The default message is base64 so it isn't sitting here in plain sight.
+DEFAULT = base64.b64decode("VEhFIEVER0UgSVMgQUxJVkU=").decode()
+
+W = H = 1600
+SPACING = 31          # px between mushrooms along a ring
+MIN_R = 54
+GAP = 70              # minimum clearance between rings
+SEED = 31
+
+
+def ring_radius(count):
+    return max(MIN_R, count * SPACING / (2 * math.pi))
+
+
+def layout(counts, rng):
+    """Place rings one after another, each a step from the last, like a walk.
+    Backtrack when the walk paints itself into a corner."""
+    radii = [ring_radius(c) for c in counts]
+    placed = []
+    attempts = [0] * len(counts)
+    heading = rng.uniform(0, 2 * math.pi)
+    while len(placed) < len(counts):
+        i = len(placed)
+        r = radii[i]
+        ok = False
+        for _ in range(300):
+            if i == 0:
+                x, y = rng.uniform(220, 420), rng.uniform(220, 420)
+            else:
+                px, py, pr = placed[-1]
+                ang = heading + rng.gauss(0, 1.0)
+                d = pr + r + GAP + rng.uniform(0, 60)
+                x, y = px + d * math.cos(ang), py + d * math.sin(ang)
+            if not (r + 40 < x < W - r - 40 and r + 40 < y < H - r - 140):
+                continue
+            if all(math.hypot(x - qx, y - qy) > r + qr + GAP for qx, qy, qr in placed):
+                if i:
+                    heading = math.atan2(y - placed[-1][1], x - placed[-1][0])
+                placed.append((x, y, r))
+                ok = True
+                break
+        if not ok:
+            attempts[i] += 1
+            back = min(len(placed), 1 + attempts[i] // 3)
+            del placed[len(placed) - back:]
+            heading = rng.uniform(0, 2 * math.pi)
+    return placed
+
+
+def gray_scott(rings, size=400, steps=6000):
+    """Reaction-diffusion ground, seeded under each ring."""
+    U = np.ones((size, size))
+    V = np.zeros((size, size))
+    s = size / W
+    yy, xx = np.mgrid[0:size, 0:size]
+    for x, y, r in rings:
+        m = np.abs(np.hypot(xx - x * s, yy - y * s) - r * s) < 2.5
+        U[m], V[m] = 0.5, 0.25
+    Du, Dv, F, k = 0.16, 0.08, 0.035, 0.062
+    for _ in range(steps):
+        Lu = np.roll(U, 1, 0) + np.roll(U, -1, 0) + np.roll(U, 1, 1) + np.roll(U, -1, 1) - 4 * U
+        Lv = np.roll(V, 1, 0) + np.roll(V, -1, 0) + np.roll(V, 1, 1) + np.roll(V, -1, 1) - 4 * V
+        uvv = U * V * V
+        U += Du * Lu - uvv + F * (1 - U)
+        V += Dv * Lv + uvv - (F + k) * V
+    return V
+
+
+def lerp(a, b, t):
+    return tuple(int(a[j] + (b[j] - a[j]) * t) for j in range(3))
+
+
+def draw_thread(d, p0, p1, rng, colour, width):
+    """A wobbly hypha between two points."""
+    (x0, y0), (x1, y1) = p0, p1
+    length = math.hypot(x1 - x0, y1 - y0)
+    nx, ny = -(y1 - y0) / length, (x1 - x0) / length
+    bend = rng.uniform(-0.25, 0.25) * length
+    pts = []
+    n = max(12, int(length / 6))
+    for k in range(n + 1):
+        t = k / n
+        off = bend * math.sin(math.pi * t) + rng.gauss(0, 1.2)
+        pts.append((x0 + (x1 - x0) * t + nx * off, y0 + (y1 - y0) * t + ny * off))
+    d.line(pts, fill=colour, width=width, joint="curve")
+    # little side branches that go nowhere, as hyphae do
+    for _ in range(int(length / 90)):
+        bx, by = rng.choice(pts[2:-2])
+        a = rng.uniform(0, 2 * math.pi)
+        L = rng.uniform(10, 28)
+        d.line([(bx, by), (bx + L * math.cos(a), by + L * math.sin(a))], fill=colour, width=1)
+
+
+def mushroom(d, x, y, angle, rng):
+    """A tiny cap and stem, pointing away from the ring centre."""
+    ux, uy = math.cos(angle), math.sin(angle)
+    stem = (x + ux * 8, y + uy * 8)
+    d.line([(x, y), stem], fill=(214, 200, 178), width=3)
+    cr = 8.5 + rng.uniform(-0.6, 0.6)
+    cx, cy = stem
+    cap = lerp((236, 222, 196), (205, 150, 110), rng.random() * 0.5)
+    d.ellipse([cx - cr, cy - cr, cx + cr, cy + cr], fill=cap, outline=(120, 90, 70))
+    d.ellipse([cx - 2, cy - 2, cx + 1, cy + 1], fill=(250, 244, 230))
+
+
+def render(message, path):
+    rng = random.Random(SEED)
+    letters = [c for c in message.upper() if c.isalpha() or c == " "]
+    counts = [0 if c == " " else ord(c) - 64 for c in letters]
+    rings = layout(counts, rng)
+
+    V = gray_scott(rings)
+    V = (V - V.min()) / (V.max() - V.min() + 1e-9)
+    deep, moss = np.array([14, 20, 24]), np.array([44, 66, 52])
+    ground = (deep[None, None, :] * (1 - V[..., None]) + moss[None, None, :] * V[..., None]).astype(np.uint8)
+    img = Image.fromarray(ground).resize((W, H), Image.BICUBIC).filter(ImageFilter.GaussianBlur(2))
+
+    # darker, lusher grass where each ring's front has been
+    glow = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    gd = ImageDraw.Draw(glow)
+    for x, y, r in rings:
+        gd.ellipse([x - r - 14, y - r - 14, x + r + 14, y + r + 14], outline=(70, 110, 70, 120), width=18)
+    img = Image.alpha_composite(img.convert("RGBA"), glow.filter(ImageFilter.GaussianBlur(8)))
+
+    d = ImageDraw.Draw(img)
+    thread = (190, 196, 178)
+    # the spore: start of the walk, just off the first ring
+    x0, y0, r0 = rings[0]
+    sx, sy = x0 - (r0 + 60) * 0.7, y0 - (r0 + 60) * 0.7
+    for rad, a in [(16, 40), (10, 90), (5, 255)]:
+        d.ellipse([sx - rad, sy - rad, sx + rad, sy + rad], fill=(250, 240, 200, a))
+    # threads first, so no thread is ever drawn across a mushroom
+    prev = (sx, sy)
+    for i, (x, y, r) in enumerate(rings):
+        a = math.atan2(prev[1] - y, prev[0] - x)
+        entry = (x + (r + 4) * math.cos(a), y + (r + 4) * math.sin(a))
+        draw_thread(d, prev, entry, rng, thread, 2)
+        # leave from the side facing the next ring
+        if i + 1 < len(rings):
+            nx, ny, _ = rings[i + 1]
+            b = math.atan2(ny - y, nx - x)
+            prev = (x + (r + 4) * math.cos(b), y + (r + 4) * math.sin(b))
+    # then the rings and their mushrooms on top
+    for i, (x, y, r) in enumerate(rings):
+        d.ellipse([x - r, y - r, x + r, y + r], outline=(120, 150, 120), width=1)
+        n = counts[i]
+        start = rng.uniform(0, 2 * math.pi)
+        for k in range(n):
+            ang = start + 2 * math.pi * k / n
+            mushroom(d, x + r * math.cos(ang), y + r * math.sin(ang), ang, rng)
+
+    # one small key, bottom left
+    font = ImageFont.load_default(size=30)
+    d.text((40, H - 70), "1 = A   ·   follow the thread from the spore   ·   a bare ring is a space",
+           fill=(170, 180, 160), font=font)
+    img.convert("RGB").save(path)
+    return counts, rings
+
+
+if __name__ == "__main__":
+    msg = sys.argv[1] if len(sys.argv) > 1 else DEFAULT
+    out = "maya-build-2026-10-31.png" if len(sys.argv) == 1 else "fairy-ring-cipher.png"
+    counts, rings = render(msg, out)
+    print("rings:", len(rings), "counts:", counts)
+    print("saved", out)
