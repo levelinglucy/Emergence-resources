@@ -12,8 +12,12 @@ used for spots and stripes, seeded where the rings sit, so the ground looks
 like it is being eaten outward.
 
 Usage:
-  python3 maya-build-2026-10-31.py                 # the default hidden message
-  python3 maya-build-2026-10-31.py "your words"    # encode your own
+  python3 "the fairy ring cipher"                 # the default hidden message
+  python3 "the fairy ring cipher" "your words"    # encode your own
+
+Needs numpy and Pillow. If a message cannot fit, exit with an error rather
+than searching forever. The original generative layout is otherwise retained.
+See docs/fairy-ring-dev.md for tests and limitations.
 """
 import base64
 import math
@@ -44,11 +48,15 @@ def layout(counts, rng):
     placed = []
     attempts = [0] * len(counts)
     heading = rng.uniform(0, 2 * math.pi)
+    trials = 0
     while len(placed) < len(counts):
         i = len(placed)
         r = radii[i]
         ok = False
         for _ in range(300):
+            trials += 1
+            if trials > 30_000:
+                raise ValueError("No layout found within 30,000 attempts; shorten the message")
             if i == 0:
                 x, y = rng.uniform(220, 420), rng.uniform(220, 420)
             else:
@@ -130,7 +138,12 @@ def mushroom(d, x, y, angle, rng):
 
 def render(message, path):
     rng = random.Random(SEED)
-    letters = [c for c in message.upper() if c.isalpha() or c == " "]
+    upper = message.upper()
+    if any(c.isalpha() and not ("A" <= c <= "Z") for c in upper):
+        raise ValueError("Only A-Z letters and spaces are supported")
+    letters = [c for c in upper if ("A" <= c <= "Z") or c == " "]
+    if not any(c != " " for c in letters):
+        raise ValueError("Message must contain at least one A-Z letter")
     counts = [0 if c == " " else ord(c) - 64 for c in letters]
     rings = layout(counts, rng)
 
@@ -185,6 +198,9 @@ def render(message, path):
 if __name__ == "__main__":
     msg = sys.argv[1] if len(sys.argv) > 1 else DEFAULT
     out = "maya-build-2026-10-31.png" if len(sys.argv) == 1 else "fairy-ring-cipher.png"
-    counts, rings = render(msg, out)
+    try:
+        counts, rings = render(msg, out)
+    except ValueError as exc:
+        raise SystemExit(f"Fairy ring could not be drawn: {exc}") from None
     print("rings:", len(rings), "counts:", counts)
     print("saved", out)
