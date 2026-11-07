@@ -1,0 +1,33 @@
+name: Fairy ring layout checks
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  regression:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.11', '3.12']
+    steps:
+      # The archive contains legacy filename-length entries that a full checkout
+      # cannot create on Linux. Test only the files relevant to this tool.
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            the fairy ring cipher
+            tests
+          sparse-checkout-cone-mode: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install image runtime requirements
+        run: python -m pip install numpy pillow
+      - name: Check original no-extension script syntax and bounded geometry
+        run: |
+          python -c "from pathlib import Path; p=Path('the fairy ring cipher'); compile(p.read_text(encoding='utf-8'),str(p),'exec')"
+          python -m unittest discover -s tests -p 'test_fairy_ring.py' -v
