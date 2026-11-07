@@ -1,0 +1,163 @@
+"""
+maya-build-2026-11-04.py: a sandpile, listened to.
+
+A 24 x 24 table. Grains of sand drop onto it one at a time, at random spots.
+Any square holding four grains topples: it gives one grain to each neighbour,
+and grains pushed off the edge fall away. A topple can tip a neighbour over
+four, which topples, which tips another... an avalanche.
+
+Nobody tunes this pile. It tunes itself to the edge (self-organised
+criticality, Bak, Tang and Wiesenfeld, 1987): most grains do nothing, some set
+off a little slide, and every so often one grain, no different from the
+others, rearranges half the table. Sizes follow a power law, so there is no
+"typical" avalanche.
+
+How it sounds:
+  - each grain landing is a quiet tick, its pitch set by where it lands
+  - while an avalanche runs, time stops: no new grain falls until the pile
+    settles. Each wave of topples is a chord. The near topples ring high and
+    the far ones low, so a slide spreading outward is heard falling in pitch
+  - the low drone is the weight of the pile. It swells as sand piles up and
+    sags when a big avalanche throws grains off the edge
+
+Scale: A minor pentatonic. Same seed, same piece, forever.
+
+Usage:
+  python3 maya-build-2026-11-04.py            # writes maya-build-2026-11-04.mp3
+  python3 maya-build-2026-11-04.py --seed 7   # a different pile, a different piece
+Needs numpy and lameenc (pip install numpy lameenc).
+"""
+import argparse
+from collections import Counter
+
+import numpy as np
+
+N = 24
+SR = 44100
+BEAT = 0.25          # seconds between grains when nothing is sliding
+WAVE = 0.065         # seconds per toppling wave inside an avalanche
+TARGET = 150.0       # length of the piece in seconds
+WARMUP = 30000       # silent grains first, so the pile is already critical
+
+PENTA = [0, 3, 5, 7, 10]
+FREQS = [110.0 * 2 ** ((12 * (i // 5) + PENTA[i % 5]) / 12) for i in range(20)]  # A2..G6
+
+
+def note_bank(decay, length, bright):
+    t = np.arange(int(SR * length)) / SR
+    env = np.exp(-t / decay) * np.minimum(1, t / 0.004)
+    bank = []
+    for f in FREQS:
+        w = np.sin(2 * np.pi * f * t) + bright * np.sin(2 * np.pi * 4 * f * t) * np.exp(-t / (decay * 0.2))
+        bank.append((w * env).astype(np.float32))
+    return bank
+
+
+def topple(grid):
+    """Run one avalanche to rest. Returns a list of waves, each a list of (r, c)."""
+    waves = []
+    while True:
+        over = np.argwhere(grid >= 4)
+        if len(over) == 0:
+            return waves
+        waves.append([tuple(p) for p in over])
+        for r, c in over:
+            grid[r, c] -= 4
+            for dr, dc in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                rr, cc = r + dr, c + dc
+                if 0 <= rr < N and 0 <= cc < N:
+                    grid[rr, cc] += 1
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--seed", type=int, default=31)
+    ap.add_argument("--out", default="maya-build-2026-11-04.mp3")
+    args = ap.parse_args()
+    rng = np.random.default_rng(args.seed)
+
+    grid = np.zeros((N, N), dtype=np.int32)
+    for _ in range(WARMUP):
+        r, c = rng.integers(0, N, 2)
+        grid[r, c] += 1
+        topple(grid)
+
+    # Compose: a list of (time, pitch index, amplitude, kind) plus pile mass over time.
+    events, mass_track, sizes = [], [], []
+    biggest = (0, 0.0)
+    t = 1.0
+    drops = 0
+    while t < TARGET - 6:
+        r, c = rng.integers(0, N, 2)
+        grid[r, c] += 1
+        drops += 1
+        events.append((t, 8 + (r * 3 + c) % 7, 0.10, "tick"))
+        waves = topple(grid)
+        size = sum(len(w) for w in waves)
+        sizes.append(size)
+        if size > biggest[0]:
+            biggest = (size, t)
+        t += 0.04 if waves else 0
+        for w in waves:
+            dist = Counter()
+            for rr, cc in w:
+                d = abs(rr - r) + abs(cc - c)
+                dist[max(0, 19 - d // 2)] += 1
+            amp = 0.16 + 0.06 * np.log1p(len(w))
+            for p, n in dist.most_common(3):
+                events.append((t, p, amp * (n / len(w)) ** 0.5, "slide"))
+            t += WAVE
+        mass_track.append((t, int(grid.sum())))
+        t += BEAT
+
+    total = t + 4.0
+    out = np.zeros(int(SR * total) + SR * 3, dtype=np.float32)
+    ticks = note_bank(0.05, 0.3, 0.6)
+    slides = note_bank(0.45, 1.6, 0.25)
+    for when, p, amp, kind in events:
+        w = ticks[p] if kind == "tick" else slides[p]
+        i = int(when * SR)
+        out[i:i + len(w)] += amp * w
+
+    # Drone: the pile's weight.
+    times = np.array([m[0] for m in mass_track])
+    masses = np.array([m[1] for m in mass_track], dtype=float)
+    lvl = (masses - masses.min()) / max(1.0, masses.max() - masses.min())
+    ts = np.arange(len(out)) / SR
+    env = np.interp(ts, times, lvl) * np.minimum(1, ts / 4) * np.clip((total - ts) / 3, 0, 1)
+    drone = np.sin(2 * np.pi * 55 * ts) + 0.5 * np.sin(2 * np.pi * 82.41 * ts) + 0.2 * np.sin(2 * np.pi * 110.3 * ts)
+    out += (0.07 + 0.12 * env) * drone * np.clip(np.minimum(ts / 4, (total - ts) / 3), 0, 1)
+
+    # A little room: four feedback combs.
+    wet = np.zeros_like(out)
+    for delay_ms, fb in ((29.7, 0.72), (37.1, 0.70), (41.1, 0.68), (43.7, 0.66)):
+        d = int(SR * delay_ms / 1000)
+        buf = out.copy()
+        for k in range(d, len(buf), d):
+            buf[k:k + d] += fb * buf[k - d:k][: len(buf[k:k + d])]
+        wet += buf
+    mix = 0.75 * out + 0.06 * wet
+    mix = np.tanh(1.2 * mix / np.max(np.abs(mix)))
+    mix = (mix / np.max(np.abs(mix)) * 0.9 * 32767).astype(np.int16)
+
+    import lameenc
+    enc = lameenc.Encoder()
+    enc.set_bit_rate(160)
+    enc.set_in_sample_rate(SR)
+    enc.set_channels(1)
+    enc.set_quality(2)
+    data = enc.encode(mix.tobytes()) + enc.flush()
+    with open(args.out, "wb") as f:
+        f.write(data)
+
+    s = np.array(sizes)
+    print(f"grains dropped: {drops}, length: {len(mix) / SR:.1f}s")
+    print(f"grains that did nothing: {(s == 0).sum()}")
+    for lo, hi in ((1, 1), (2, 9), (10, 99), (100, 999), (1000, 10**9)):
+        print(f"  avalanches of {lo}-{hi} topples: {((s >= lo) & (s <= hi)).sum()}")
+    m, sec = divmod(biggest[1], 60)
+    print(f"biggest avalanche: {biggest[0]} topples, starting at {int(m)}:{int(sec):02d}")
+
+
+if __name__ == "__main__":
+    main()
