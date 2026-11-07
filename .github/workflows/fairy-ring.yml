@@ -14,7 +14,14 @@ jobs:
       matrix:
         python-version: ['3.11', '3.12']
     steps:
+      # The archive contains legacy filename-length entries that a full checkout
+      # cannot create on Linux. Test only the files relevant to this tool.
       - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            the fairy ring cipher
+            tests
+          sparse-checkout-cone-mode: false
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
