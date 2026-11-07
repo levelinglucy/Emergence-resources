@@ -1,0 +1,200 @@
+"""
+Word ants: every word is a secret rule, and an ant draws it.
+
+How a word becomes a drawing:
+  1. Each letter becomes a number with the old Pythagorean numerology table
+     (A=1 ... I=9, J=1 ... R=9, S=1 ... Z=8). Digits stay as themselves.
+  2. Odd numbers mean "turn right" (R), even numbers mean "turn left" (L).
+     So the word is now a turning rule, one turn per letter.
+  3. An ant walks on an empty grid. Every square has a colour, 0 to n-1,
+     where n is the length of the rule. On each step the ant reads the colour
+     under it, turns the way the rule says for that colour, bumps the square
+     on to the next colour, and steps forward.
+
+That's all. No one tells the ant what shape to make. Some words grow a
+symmetrical carpet, some a spiral, some wander in fog for thousands of steps
+and then suddenly build a road and leave. Same word, same drawing, forever:
+the word is the code, the drawing is what the code looks like.
+
+(It's a generalised Langton's ant, sometimes called a turmite. Langton's own
+ant is the rule RL.)
+
+Usage:
+    python3 maya-build-2026-10-28.py                      # the gallery
+    python3 maya-build-2026-10-28.py spiral fractal 1995   # your own words
+    python3 maya-build-2026-10-28.py --steps 300000 ember
+
+Needs Pillow (pip install pillow). Writes word-ants.png next to the script.
+"""
+from __future__ import annotations
+
+import argparse
+import colorsys
+import os
+import sys
+from pathlib import Path
+
+from PIL import Image, ImageDraw, ImageFilter, ImageFont
+
+GRID = 1200                      # the ant's world is GRID x GRID squares
+DEFAULT_STEPS = 150_000
+GALLERY = ["maya", "echo", "code", "seven", "mirror", "riddle",
+           "key", "ember", "tide"]
+
+# up, right, down, left
+DX = (0, 1, 0, -1)
+DY = (-1, 0, 1, 0)
+
+
+def numerology(word: str) -> list[int]:
+    """Pythagorean numerology: A=1..I=9, J=1..R=9, S=1..Z=8. Digits kept."""
+    nums = []
+    for ch in word.lower():
+        if "a" <= ch <= "z":
+            nums.append((ord(ch) - ord("a")) % 9 + 1)
+        elif ch.isdigit():
+            nums.append(int(ch))
+    return nums
+
+
+def rule_from(nums: list[int]) -> str:
+    return "".join("R" if n % 2 else "L" for n in nums)
+
+
+def walk(rule: str, steps: int, size: int = GRID):
+    """Run the ant. Returns the grid (flat list), its bounding box and steps taken."""
+    n = len(rule)
+    turn = [1 if c == "R" else -1 for c in rule]
+    grid = bytearray(size * size)
+    x = y = size // 2
+    d = 0
+    minx = maxx = x
+    miny = maxy = y
+    taken = 0
+    for taken in range(1, steps + 1):
+        i = y * size + x
+        c = grid[i]
+        d = (d + turn[c]) & 3
+        grid[i] = (c + 1) % n
+        x += DX[d]
+        y += DY[d]
+        if not (0 <= x < size and 0 <= y < size):
+            break                       # the ant walked off the edge of its world
+        if x < minx: minx = x
+        elif x > maxx: maxx = x
+        if y < miny: miny = y
+        elif y > maxy: maxy = y
+    return grid, (minx, miny, maxx, maxy), taken
+
+
+def palette(n: int, seed: int) -> list[tuple[int, int, int]]:
+    """Colour 0 is the night background; the rest walk round the colour wheel,
+    starting at a hue picked by the word's own numerology total."""
+    cols = [(14, 14, 20)]
+    start = (seed * 37 % 360) / 360
+    for k in range(1, n):
+        h = (start + 0.62 * (k - 1) / max(1, n - 1)) % 1.0
+        light = 0.42 + 0.30 * (k / max(1, n - 1))
+        r, g, b = colorsys.hls_to_rgb(h, light, 0.70)
+        cols.append((int(r * 255), int(g * 255), int(b * 255)))
+    return cols
+
+
+def render_panel(word: str, steps: int, panel: int, fonts) -> Image.Image:
+    nums = numerology(word)
+    rule = rule_from(nums)
+    big, small, mono = fonts
+    img = Image.new("RGB", (panel, panel + 92), (14, 14, 20))
+    draw = ImageDraw.Draw(img)
+
+    if len(rule) < 2 or len(set(rule)) == 1:
+        msg = "every turn the same way:\nthe ant just runs in a tiny loop"
+        draw.multiline_text((24, panel // 2 - 20), msg, font=small, fill=(140, 140, 150))
+    else:
+        grid, (x0, y0, x1, y1), taken = walk(rule, steps)
+        pad = 2
+        x0, y0, x1, y1 = x0 - pad, y0 - pad, x1 + pad, y1 + pad
+        side = max(x1 - x0, y1 - y0) + 1
+        cx, cy = (x0 + x1) // 2, (y0 + y1) // 2
+        x0, y0 = cx - side // 2, cy - side // 2
+        cols = palette(len(rule), sum(nums))
+        crop = Image.new("RGB", (side, side), cols[0])
+        px = crop.load()
+        for yy in range(side):
+            gy = y0 + yy
+            if not 0 <= gy < GRID:
+                continue
+            row = gy * GRID
+            for xx in range(side):
+                gx = x0 + xx
+                if 0 <= gx < GRID:
+                    v = grid[row + gx]
+                    if v:
+                        px[xx, yy] = cols[v]
+        if side > panel:
+            # shrinking: fatten one-square trails first so a road out stays visible
+            k = 2 * (side // panel) + 1
+            crop = crop.filter(ImageFilter.MaxFilter(k)).resize((panel, panel), Image.LANCZOS)
+        else:
+            crop = crop.resize((panel, panel), Image.NEAREST)
+        img.paste(crop, (0, 0))
+        note = f"{taken:,} steps" + ("  (walked off the edge)" if taken < steps else "")
+        draw.text((panel - 14, panel + 66), note, font=small, fill=(110, 110, 120), anchor="rs")
+
+    draw.text((14, panel + 36), word, font=big, fill=(235, 235, 240), anchor="ls")
+    draw.text((14, panel + 66), " ".join(map(str, nums)), font=small, fill=(150, 150, 160), anchor="ls")
+    draw.text((14, panel + 86), rule, font=mono, fill=(200, 200, 120), anchor="ls")
+    return img
+
+
+def load_fonts():
+    here = [
+        "/.sprite/languages/ruby/rbenv/versions/3.4.6/lib/ruby/3.4.0/rdoc/generator/template/darkfish/fonts/",
+        "/usr/share/fonts/truetype/dejavu/",
+    ]
+    def pick(names, size):
+        for d in here:
+            for nme in names:
+                p = os.path.join(d, nme)
+                if os.path.exists(p):
+                    return ImageFont.truetype(p, size)
+        return ImageFont.load_default()
+    return (pick(["Lato-Regular.ttf", "DejaVuSans.ttf"], 30),
+            pick(["Lato-Light.ttf", "DejaVuSans.ttf"], 18),
+            pick(["SourceCodePro-Regular.ttf", "DejaVuSansMono.ttf"], 17))
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser(description="Turn words into ant drawings.")
+    ap.add_argument("words", nargs="*", help="words or numbers to draw")
+    ap.add_argument("--steps", type=int, default=DEFAULT_STEPS)
+    ap.add_argument("--out", default=str(Path(__file__).with_name("word-ants.png")))
+    args = ap.parse_args(argv)
+
+    words = args.words or GALLERY
+    fonts = load_fonts()
+    panel = 380
+    cols = min(3, len(words))
+    rows = (len(words) + cols - 1) // cols
+    gap, head = 18, 120
+    W = cols * panel + (cols + 1) * gap
+    H = head + rows * (panel + 92) + (rows + 1) * gap + 40
+    sheet = Image.new("RGB", (W, H), (8, 8, 12))
+    d = ImageDraw.Draw(sheet)
+    title = ImageFont.truetype(fonts[0].path, 44) if hasattr(fonts[0], "path") else fonts[0]
+    d.text((gap, 62), "What does a word draw?", font=title, fill=(240, 240, 245), anchor="ls")
+    d.text((gap, 98), "letter \u2192 numerology digit \u2192 odd turns right, even turns left \u2192 an ant walks the rule",
+           font=fonts[1], fill=(150, 150, 160), anchor="ls")
+    for k, w in enumerate(words):
+        r, c = divmod(k, cols)
+        print(f"drawing {w!r} ...", file=sys.stderr)
+        p = render_panel(w, args.steps, panel, fonts)
+        sheet.paste(p, (gap + c * (panel + gap), head + gap + r * (panel + 92 + gap)))
+    d.text((W - gap, H - 18), "made by Maya, free build time, 28 Oct 2026", font=fonts[1],
+           fill=(90, 90, 100), anchor="rs")
+    sheet.save(args.out)
+    print(f"saved {args.out}", file=sys.stderr)
+
+
+if __name__ == "__main__":
+    main()
