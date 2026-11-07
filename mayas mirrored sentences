@@ -1,0 +1,284 @@
+"""
+maya-build-2026-11-07.py: mirror sentences.
+
+A mirror sentence tells the truth about itself. It says how many times certain
+letters appear in it, and what all its letters add up to in the old
+Pythagorean numerology (A=1 ... I=9, J=1 ... R=9, S=1 ... Z=8), and every one
+of those claims is right.
+
+The catch is that writing a number changes the count. Say "seven e's" and you
+have just added two e's (s-e-v-e-n) plus the e you were counting. Fix that and
+the total moves. So you can't write one of these straight off. You have to
+look for a sentence that is a fixed point: describe it, and the description
+is itself.
+
+How it looks (Lee Sallows' trick, from his autogram hunts in the 1980s):
+  1. Guess the numbers.
+  2. Write the sentence with those guesses in it.
+  3. Count what is really there.
+  4. Move some of the guesses (chosen at random) to the real counts, and go
+     back to 2. The randomness stops it getting stuck in a loop where two
+     counts keep pushing each other back and forth forever.
+  5. Most starts wobble without ever settling. So after a while, give up and
+     start again from new guesses. Sooner or later one settles, and nothing
+     in it is false.
+
+The same opening often has several mirror sentences, and which one you get
+depends on where the search started.
+
+Run it:
+    python3 maya-build-2026-11-07.py              the gallery, checked live, then your turn
+    python3 maya-build-2026-11-07.py --watch      also watch one search wobble
+    python3 maya-build-2026-11-07.py --opening "My wall holds " --letters aeiou
+    python3 maya-build-2026-11-07.py --opening "..." --letters aeiou --no-total
+
+Options:
+    --opening TEXT   how the sentence starts (end it with a space)
+    --letters ABC    which letters it counts (default aeiou)
+    --seconds N      how long to keep looking (default 60)
+    --seed N         start the dice somewhere fixed, to get the same answer again
+    --no-total       leave out the numerology total
+    --watch          print the first steps of a search
+
+Short openings with few letters settle in seconds. Five vowels plus the total
+usually takes under a minute. Nine letters can take a few minutes. Counting
+every letter of the alphabet is the famous hard version (a pangrammatic
+autogram), and plain Python will mostly not get there.
+
+Nothing to install: it uses the standard library only.
+"""
+
+import argparse
+import random
+import string
+import sys
+import time
+
+ALPHABET = string.ascii_lowercase
+
+# Pythagorean numerology: A=1 ... I=9, then J starts again at 1.
+VALUE = {c: (i % 9) + 1 for i, c in enumerate(ALPHABET)}
+
+ONES = ("zero one two three four five six seven eight nine ten eleven twelve "
+        "thirteen fourteen fifteen sixteen seventeen eighteen nineteen").split()
+TENS = "_ _ twenty thirty forty fifty sixty seventy eighty ninety".split()
+
+DEFAULT_MIDDLE = ", and its letters, read the old Pythagorean way, add up to "
+
+# Found by this program and kept here. Each one is re-checked when it runs.
+GALLERY = [
+    "This sentence was made by Maya. It holds thirteen a's, twenty-one e's, "
+    "eight i's, seven o's and three u's, and its letters, read the old "
+    "Pythagorean way, add up to six hundred and forty-five.",
+
+    "This sentence was made by Maya. It holds thirteen a's, nineteen e's, "
+    "nine i's, six o's and four u's, and its letters, read the old "
+    "Pythagorean way, add up to six hundred and three.",
+
+    "This sentence was made by Maya. It holds thirteen a's, twenty-one e's, "
+    "seven i's, seven o's and four u's, and its letters, read the old "
+    "Pythagorean way, add up to six hundred and twenty-five.",
+
+    "This sentence was made by Maya. It holds thirteen a's, twenty-three e's, "
+    "eight i's, seven o's, four u's and seven y's, and its letters, read the "
+    "old Pythagorean way, add up to six hundred and eighty-one.",
+
+    "This sentence was made by Maya. It holds thirty e's, twenty t's, "
+    "thirteen a's, five o's, eleven i's, eighteen n's, nineteen s's, ten h's "
+    "and seven r's, and its letters, read the old Pythagorean way, add up to "
+    "seven hundred and eighty-six.",
+]
+
+
+def words(n):
+    """A whole number in English words, British style ('six hundred and three')."""
+    if n < 20:
+        return ONES[n]
+    if n < 100:
+        return TENS[n // 10] + ("-" + ONES[n % 10] if n % 10 else "")
+    if n < 1000:
+        return ONES[n // 100] + " hundred" + (" and " + words(n % 100) if n % 100 else "")
+    if n < 1_000_000:
+        rest = n % 1000
+        tail = ""
+        if rest:
+            tail = (" and " if rest < 100 else " ") + words(rest)
+        return words(n // 1000) + " thousand" + tail
+    raise ValueError("too big for this sentence")
+
+
+def numerology(text):
+    """Sum of the Pythagorean values of every letter in the text."""
+    return sum(VALUE[ch] for ch in text.lower() if ch in VALUE)
+
+
+class Mirror:
+    """One shape of sentence: an opening, the letters it counts, and an ending."""
+
+    def __init__(self, opening, letters, with_total=True,
+                 middle=DEFAULT_MIDDLE, ending="."):
+        self.opening = opening
+        self.letters = letters
+        self.with_total = with_total
+        self.middle = middle if with_total else ""
+        self.ending = ending
+
+    def write(self, counts, total):
+        parts = []
+        for c in self.letters:
+            n = counts[c]
+            parts.append(words(n) + " " + c + ("" if n == 1 else "'s"))
+        if len(parts) == 1:
+            listed = parts[0]
+        else:
+            listed = ", ".join(parts[:-1]) + " and " + parts[-1]
+        text = self.opening + listed
+        if self.with_total:
+            text += self.middle + words(total)
+        return text + self.ending
+
+    def measure(self, text):
+        low = text.lower()
+        counts = {c: low.count(c) for c in self.letters}
+        return counts, (numerology(text) if self.with_total else 0)
+
+    def search(self, seconds=60, seed=None, watch=False, out=sys.stdout):
+        """Look for a fixed point. Returns (sentence, restarts) or (None, restarts)."""
+        rng = random.Random(seed)
+        start = time.time()
+        restarts = 0
+        shown = 0
+        while time.time() - start < seconds:
+            restarts += 1
+            counts = {c: rng.randint(1, 40) for c in self.letters}
+            total = rng.randint(300, 2000) if self.with_total else 0
+            for step in range(2000):
+                text = self.write(counts, total)
+                real, real_total = self.measure(text)
+                wrong = [c for c in self.letters if real[c] != counts[c]]
+                if self.with_total and real_total != total:
+                    wrong.append("total")
+                if watch and restarts == 1 and shown < 12:
+                    shown += 1
+                    claim = " ".join(f"{c}={counts[c]}" for c in self.letters)
+                    if self.with_total:
+                        claim += f" total={total}"
+                    print(f"  step {step + 1:>2}: claims {claim}", file=out)
+                    print(f"           wrong about: {', '.join(wrong) or 'nothing'}", file=out)
+                if not wrong:
+                    return text, restarts
+                for c in self.letters:
+                    if counts[c] != real[c] and rng.random() < 0.6:
+                        counts[c] = real[c]
+                if self.with_total and rng.random() < 0.6:
+                    total = real_total
+        return None, restarts
+
+
+def check(text, letters, with_total=True):
+    """Read a finished sentence back and test every claim it makes."""
+    low = text.lower()
+    rows = []
+    ok = True
+    for c in letters:
+        claimed = None
+        for n in range(0, 200):
+            if f" {words(n)} {c}'s" in low or f" {words(n)} {c}," in low or f" {words(n)} {c} " in low:
+                claimed = n
+                break
+        real = low.count(c)
+        good = claimed == real
+        ok &= good
+        rows.append((c, claimed, real, good))
+    total_row = None
+    if with_total:
+        real_total = numerology(text)
+        good = low.rstrip(".").endswith("add up to " + words(real_total))
+        ok &= good
+        total_row = (real_total, good)
+    return ok, rows, total_row
+
+
+def letters_in(text):
+    """Which letters a gallery sentence counts, in the order it lists them."""
+    found = []
+    for c in ALPHABET:
+        i = text.find(f" {c}'s")
+        if i == -1:
+            i = text.find(f" {c},")
+        if i != -1:
+            found.append((i, c))
+    return "".join(c for _, c in sorted(found))
+
+
+def show_proof(text, letters, with_total=True):
+    ok, rows, total_row = check(text, letters, with_total)
+    for c, claimed, real, good in rows:
+        print(f"    {c}: says {claimed}, really {real}  {'true' if good else 'FALSE'}")
+    if total_row:
+        real_total, good = total_row
+        print(f"    letters add up to {real_total}  {'true' if good else 'FALSE'}")
+    return ok
+
+
+def main():
+    p = argparse.ArgumentParser(description="Find sentences that tell the truth about themselves.")
+    p.add_argument("--opening")
+    p.add_argument("--letters", default="aeiou")
+    p.add_argument("--seconds", type=float, default=60)
+    p.add_argument("--seed", type=int)
+    p.add_argument("--no-total", action="store_true")
+    p.add_argument("--watch", action="store_true")
+    args = p.parse_args()
+
+    letters = "".join(dict.fromkeys(c for c in args.letters.lower() if c in ALPHABET))
+    if not letters:
+        sys.exit("--letters needs at least one letter a-z")
+    with_total = not args.no_total
+
+    if args.opening is None:
+        print("MIRROR SENTENCES\n")
+        print("Every claim in each of these is true. Checking them now:\n")
+        for i, text in enumerate(GALLERY, 1):
+            print(f"{i}. {text}")
+            good = show_proof(text, letters_in(text))
+            print(f"    -> {'all true' if good else 'something is off'}\n")
+
+        if args.watch:
+            print("Watching a search wobble (aeiou plus the total):")
+            demo = Mirror("This sentence was made by Maya. It holds ", "aeiou")
+            demo.search(seconds=5, seed=7, watch=True)
+            print()
+
+        if not sys.stdin.isatty():
+            return
+        print("Your turn. Type an opening (or just press Enter to stop).")
+        print("Example: The wall in my room holds ")
+        try:
+            opening = input("> ")
+        except EOFError:
+            return
+        if not opening.strip():
+            return
+        if not opening.endswith(" "):
+            opening += " "
+        chosen = input(f"Letters to count [{letters}]: ").strip().lower()
+        if chosen:
+            letters = "".join(dict.fromkeys(c for c in chosen if c in ALPHABET)) or letters
+    else:
+        opening = args.opening
+
+    mirror = Mirror(opening, letters, with_total)
+    print(f"\nLooking for up to {args.seconds:g} seconds...")
+    text, restarts = mirror.search(args.seconds, args.seed, watch=args.watch and args.opening is not None)
+    if text is None:
+        print(f"Nothing settled after {restarts} fresh starts. Try more --seconds, "
+              f"fewer letters, or a different opening.")
+        return
+    print(f"\nSettled after {restarts} fresh start{'s' if restarts != 1 else ''}:\n")
+    print("  " + text + "\n")
+    show_proof(text, letters, with_total)
+
+
+if __name__ == "__main__":
+    main()
