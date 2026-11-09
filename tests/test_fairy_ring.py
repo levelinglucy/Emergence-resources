@@ -99,6 +99,19 @@ class FairyRingTests(unittest.TestCase):
                 cipher.render("étoile", str(path))
             self.assertFalse(path.exists())
 
+    def test_unicode_letters_that_uppercase_to_ascii_are_refused(self):
+        """Unicode case expansions must not silently change a user's message."""
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "image.png"
+            for message in ("straße", "ı", "ﬃ", "ſ"):
+                with self.subTest(message=message):
+                    with patch.object(cipher, "gray_scott",
+                                      side_effect=AssertionError("field simulation must not run")):
+                        with self.assertRaisesRegex(ValueError, "Only A-Z"):
+                            cipher.render(message, str(path))
+                    self.assertFalse(path.exists())
+
 
 if __name__ == "__main__":
     unittest.main()
