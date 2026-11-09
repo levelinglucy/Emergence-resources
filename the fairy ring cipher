@@ -16,13 +16,18 @@ Usage:
   python3 "the fairy ring cipher" "your words"    # encode your own
 
 Needs numpy and Pillow. If a message cannot fit, exit with an error rather
-than searching forever. The original generative layout is otherwise retained.
+than searching forever. Existing output images are never overwritten, and an
+incomplete PNG is not published after an encoder failure. The original visual
+layout is retained.
 See docs/fairy-ring-dev.md for tests and limitations.
 """
 import base64
 import math
+import os
+from pathlib import Path
 import random
 import sys
+import tempfile
 
 import numpy as np
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
@@ -136,6 +141,35 @@ def mushroom(d, x, y, angle, rng):
     d.ellipse([cx - 2, cy - 2, cx + 1, cy + 1], fill=(250, 244, 230))
 
 
+def save_png_exclusively(image, path):
+    """Publish a complete PNG at a fresh name, preserving any existing image.
+
+    Stage in the destination directory before an exclusive hard-link publish.
+    A concurrent publisher winning the filename race is never overwritten.
+    """
+    target = Path(path)
+    staged = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            prefix="." + target.name + ".", suffix=".tmp",
+            dir=str(target.parent), delete=False
+        ) as temp:
+            staged = temp.name
+        image.convert("RGB").save(staged, format="PNG")
+        try:
+            os.link(staged, target)
+        except FileExistsError:
+            raise ValueError(
+                "Output already exists: {}. Move or rename it before rerunning".format(target)
+            ) from None
+    finally:
+        if staged is not None:
+            try:
+                os.unlink(staged)
+            except FileNotFoundError:
+                pass
+
+
 def render(message, path):
     rng = random.Random(SEED)
     upper = message.upper()
@@ -145,6 +179,10 @@ def render(message, path):
     if not any(c != " " for c in letters):
         raise ValueError("Message must contain at least one A-Z letter")
     counts = [0 if c == " " else ord(c) - 64 for c in letters]
+    # Refuse a repeat output before the expensive field simulation. The
+    # exclusive publication below is authoritative even if a rival writes later.
+    if os.path.lexists(path):
+        raise ValueError("Output already exists: {}. Move or rename it before rerunning".format(path))
     rings = layout(counts, rng)
 
     V = gray_scott(rings)
@@ -191,7 +229,7 @@ def render(message, path):
     font = ImageFont.load_default(size=30)
     d.text((40, H - 70), "1 = A   ·   follow the thread from the spore   ·   a bare ring is a space",
            fill=(170, 180, 160), font=font)
-    img.convert("RGB").save(path)
+    save_png_exclusively(img, path)
     return counts, rings
 
 
