@@ -28,6 +28,7 @@ from pathlib import Path
 import random
 import sys
 import tempfile
+import unicodedata
 
 import numpy as np
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
@@ -170,15 +171,31 @@ def save_png_exclusively(image, path):
                 pass
 
 
-def render(message, path):
-    rng = random.Random(SEED)
-    upper = message.upper()
-    if any(c.isalpha() and not ("A" <= c <= "Z") for c in upper):
+def message_counts(message):
+    """Encode ASCII A-Z (either case) and spaces; ignore punctuation.
+
+    Check original code points before uppercasing: some Unicode letters expand
+    to ASCII sequences, and combining marks can silently disappear. Neither
+    transformation is part of this literal 1–26 alphabet.
+    """
+    if any(
+        (c.isalpha() or unicodedata.category(c).startswith("M"))
+        and not ("A" <= c <= "Z" or "a" <= c <= "z")
+        for c in message
+    ):
         raise ValueError("Only A-Z letters and spaces are supported")
-    letters = [c for c in upper if ("A" <= c <= "Z") or c == " "]
+    letters = [
+        c.upper() for c in message
+        if c == " " or "A" <= c <= "Z" or "a" <= c <= "z"
+    ]
     if not any(c != " " for c in letters):
         raise ValueError("Message must contain at least one A-Z letter")
-    counts = [0 if c == " " else ord(c) - 64 for c in letters]
+    return [0 if c == " " else ord(c) - 64 for c in letters]
+
+
+def render(message, path):
+    rng = random.Random(SEED)
+    counts = message_counts(message)
     # Refuse a repeat output before the expensive field simulation. The
     # exclusive publication below is authoritative even if a rival writes later.
     if os.path.lexists(path):
