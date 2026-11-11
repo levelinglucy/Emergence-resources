@@ -20,11 +20,13 @@ the word is the code, the drawing is what the code looks like.
 ant is the rule RL.)
 
 Usage:
-    python3 maya-build-2026-10-28.py                      # the gallery
-    python3 maya-build-2026-10-28.py spiral fractal 1995   # your own words
-    python3 maya-build-2026-10-28.py --steps 300000 ember
+    python3 "Word ants"                      # the gallery
+    python3 "Word ants" spiral fractal 1995   # your own words
+    python3 "Word ants" --steps 300000 ember
 
 Needs Pillow (pip install pillow). Writes word-ants.png next to the script.
+Completed images are published only at unused output paths; reruns refuse to
+replace earlier art. See docs/word-ants-dev.md for tests and portability limits.
 """
 from __future__ import annotations
 
@@ -32,6 +34,7 @@ import argparse
 import colorsys
 import os
 import sys
+import tempfile
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
@@ -164,12 +167,37 @@ def load_fonts():
             pick(["SourceCodePro-Regular.ttf", "DejaVuSansMono.ttf"], 17))
 
 
+def save_png_exclusively(image: Image.Image, target: str | Path) -> None:
+    """Stage a complete image then publish at a new filename, never replace.
+
+    A same-directory hard link is the final exclusive publication gate. The
+    temporary file retains the destination suffix to preserve Pillow's former
+    format selection (PNG by default, other supported formats via --out).
+    Filesystems without hard-link support fail closed rather than replacing
+    an existing image or exposing a partial final file.
+    """
+    target = Path(target)
+    if os.path.lexists(target):
+        raise FileExistsError(f"output already exists: {target}")
+    fd, stage = tempfile.mkstemp(prefix=f".{target.name}.",
+                                suffix=target.suffix, dir=str(target.parent))
+    try:
+        os.close(fd)
+        image.save(stage)
+        os.link(stage, target)
+    finally:
+        os.unlink(stage)
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Turn words into ant drawings.")
     ap.add_argument("words", nargs="*", help="words or numbers to draw")
     ap.add_argument("--steps", type=int, default=DEFAULT_STEPS)
     ap.add_argument("--out", default=str(Path(__file__).with_name("word-ants.png")))
     args = ap.parse_args(argv)
+
+    if os.path.lexists(args.out):
+        ap.error(f"output already exists: {args.out}")
 
     words = args.words or GALLERY
     fonts = load_fonts()
@@ -192,7 +220,10 @@ def main(argv=None):
         sheet.paste(p, (gap + c * (panel + gap), head + gap + r * (panel + 92 + gap)))
     d.text((W - gap, H - 18), "made by Maya, free build time, 28 Oct 2026", font=fonts[1],
            fill=(90, 90, 100), anchor="rs")
-    sheet.save(args.out)
+    try:
+        save_png_exclusively(sheet, args.out)
+    except FileExistsError as exc:
+        ap.error(str(exc))
     print(f"saved {args.out}", file=sys.stderr)
 
 
