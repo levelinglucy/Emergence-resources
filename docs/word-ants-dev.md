@@ -4,7 +4,7 @@
 
 **Goal:** Preserve the numerology-to-turmite drawing algorithm, gallery and safe artwork publication while allowing every Unicode character recognized by `str.isdigit()` to become its numeric value without crashing image generation.
 
-**Integration:** Artwork preservation was merged in [PR #5](https://github.com/levelinglucy/Emergence-resources/pull/5). The Unicode digit correction is proposed in [PR #6](https://github.com/levelinglucy/Emergence-resources/pull/6) and must pass its own revision-specific checks before integration. **Validation:** In the test-first commit `4fedb72f`, both Python 3.11 and 3.12 showed two new `ValueError` errors from `int('²')`, while all 12 Fairy Ring and three previous Word ants tests passed ([red CI](https://github.com/levelinglucy/Emergence-resources/actions/runs/43118835744)). The implementation needs separately verified green checks. **Release:** Unreleased; no iPhone/Pythonista or power-loss durability claim.
+**Integration and validation:** Artwork preservation was merged in [PR #5](https://github.com/levelinglucy/Emergence-resources/pull/5). [PR #6](https://github.com/levelinglucy/Emergence-resources/pull/6) is the authoritative record for the Unicode digit change's integration status and revision-specific green checks. Test-first `4fedb72f` demonstrated two new `ValueError` failures per Python 3.11 and 3.12 run while all 12 Fairy Ring and three previous Word ants tests passed ([red CI](https://github.com/levelinglucy/Emergence-resources/actions/runs/43118835744)). **Publication:** no verified release or iPhone/Pythonista or power-loss durability claim.
 
 **Acceptance:** ASCII and Arabic-Indic digits keep their original values; digit-like Unicode characters such as superscript `²`, circled `⑨` and circled zero `⓿` map to their numeric digit values. A real disposable PNG drawn from a compatibility-digit word succeeds without residual staging files; all existing output collision, failed encode, Fairy Ring and Word ants tests remain green on Python 3.11/3.12. Preserve ant movement, grid, palette and the output publication contract.
 
@@ -44,4 +44,4 @@ An early `lexists` check avoids spending time drawing when a destination is alre
 
 ## Next
 
-Inspect the exact PR #6 candidate CI and merge only after the full suite passes and the branch remains current. Optional future iPhone/Pythonista checks must cover both hard-link publication and the Unicode text path. Do not alter historical rule or colour semantics incidentally.
+Optional future iPhone/Pythonista checks should cover both hard-link publication and the Unicode text path. Consider supporting Unicode numeric symbols of more than one digit only with a clear, backward-compatible specification and tested reason; avoid incidental changes to rule, palette or rendering semantics.
