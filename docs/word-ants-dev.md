@@ -2,11 +2,11 @@
 
 ## Goal and status
 
-**Goal:** Keep the original numerology-to-turmite drawing algorithm and default gallery, while protecting previously generated artwork and ensuring a failed image encode cannot leave a partial final output.
+**Goal:** Preserve the numerology-to-turmite drawing algorithm, gallery and safe artwork publication while allowing every Unicode character recognized by `str.isdigit()` to become its numeric value without crashing image generation.
 
-**Integration:** Follow [PR #5](https://github.com/levelinglucy/Emergence-resources/pull/5) for observed merge status. **Validation:** Test-first predecessor CI [43029373105](https://github.com/levelinglucy/Emergence-resources/actions/runs/43029373105) failed the three expected new cases on both Python versions. Candidate CI [43029711953](https://github.com/levelinglucy/Emergence-resources/actions/runs/43029711953) then passed 12 existing Fairy Ring and 3 new Word ants tests, with both script syntax checks, per Python 3.11 and 3.12; all four test logs inspected. Further revisions must be validated separately. **Release:** Unreleased; no iPhone/Pythonista or power-loss durability claim.
+**Integration:** Artwork preservation was merged in [PR #5](https://github.com/levelinglucy/Emergence-resources/pull/5). The Unicode digit correction is proposed in [PR #6](https://github.com/levelinglucy/Emergence-resources/pull/6) and must pass its own revision-specific checks before integration. **Validation:** In the test-first commit `4fedb72f`, both Python 3.11 and 3.12 showed two new `ValueError` errors from `int('²')`, while all 12 Fairy Ring and three previous Word ants tests passed ([red CI](https://github.com/levelinglucy/Emergence-resources/actions/runs/43118835744)). The implementation needs separately verified green checks. **Release:** Unreleased; no iPhone/Pythonista or power-loss durability claim.
 
-**Acceptance:** A short real CLI run produces a readable image in a disposable directory. A second run at the same path exits with status 2 without replacing the first image. Encoder failures leave no partial final or staging image. If another writer wins the filename race during publication, their bytes remain unchanged. Run both artwork tests on hosted Python 3.11/3.12; preserve the historical rule, grid, palette and drawing logic.
+**Acceptance:** ASCII and Arabic-Indic digits keep their original values; digit-like Unicode characters such as superscript `²`, circled `⑨` and circled zero `⓿` map to their numeric digit values. A real disposable PNG drawn from a compatibility-digit word succeeds without residual staging files; all existing output collision, failed encode, Fairy Ring and Word ants tests remain green on Python 3.11/3.12. Preserve ant movement, grid, palette and the output publication contract.
 
 ## Run
 
@@ -15,10 +15,15 @@ Install Pillow, then from the repository root:
 ```sh
 python3 -m pip install pillow
 python3 "Word ants" --steps 1000 ember --out ember.png
+python3 "Word ants" --steps 1000 'A²' --out unicode-example.png
 python3 -m unittest discover -s tests -p 'test_word_ants.py' -v
 ```
 
 The original script's introductory command examples named a nonexistent filename; the tracked entry point is `Word ants` (no extension). By default it writes `word-ants.png` next to the source. A destination that already exists is **not** replaced. Choose a fresh `--out` name or move the old file to keep both.
+
+## Unicode digit interpretation
+
+Previously `numerology()` called `int(ch)` whenever `ch.isdigit()` was true. Python's `isdigit()` also accepts superscripts and circled digits, but `int()` does not, so otherwise valid words could crash image generation before publication. We now use `unicodedata.digit(ch)` for every `isdigit()` character, retaining decimal values and accepting compatibility digits. Ordinary letters, signs and unsupported numeric symbols (such as the circled number `⑩`, which is not a single digit) retain their prior treatment. The word's characters are not rewritten or normalized; only the numeric rule is derived. This is a compatibility broadening for input characters, not a rule or art-renderer redesign. Reconsider only if a concrete ambiguity requires a stricter documented ASCII-only mode.
 
 ## Publication decision
 
@@ -30,6 +35,8 @@ An early `lexists` check avoids spending time drawing when a destination is alre
 
 ## Unreleased changes
 
+- Decode Unicode superscript and circled single digits consistently with decimal digits, avoiding `ValueError` during rendering; keep original rule, visual algorithm and safe publication.
+
 - Prevent Word ants reruns from overwriting existing art; refuse collisions before rendering and at publication.
 - Stage completely encoded images before exposing their final name, cleaning up failed or colliding stages.
 - Run disposable real drawing, encoder failure and late-collision regressions alongside the existing Fairy Ring checks on hosted Python.
@@ -37,4 +44,4 @@ An early `lexists` check avoids spending time drawing when a destination is alre
 
 ## Next
 
-Track the final integration and exact revision in PR #5. Consider an opt-in fresh-filename mode only if there is evidence users need it; do not change historical rule or colour semantics incidentally.
+Inspect the exact PR #6 candidate CI and merge only after the full suite passes and the branch remains current. Optional future iPhone/Pythonista checks must cover both hard-link publication and the Unicode text path. Do not alter historical rule or colour semantics incidentally.
