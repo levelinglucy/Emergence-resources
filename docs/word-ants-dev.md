@@ -4,7 +4,7 @@
 
 **Goal:** Keep the original numerology-to-turmite drawing algorithm and default gallery, while protecting previously generated artwork and ensuring a failed image encode cannot leave a partial final output.
 
-**Integration:** Proposed on [PR #5](https://github.com/levelinglucy/Emergence-resources/pull/5), not yet merged in this branch's documentation. **Validation:** The PR holds revision-specific hosted test results. **Release:** Unreleased; no iPhone/Pythonista or power-loss durability claim.
+**Integration:** Follow [PR #5](https://github.com/levelinglucy/Emergence-resources/pull/5) for observed merge status. **Validation:** Test-first predecessor CI [43029373105](https://github.com/levelinglucy/Emergence-resources/actions/runs/43029373105) failed the three expected new cases on both Python versions. Candidate CI [43029711953](https://github.com/levelinglucy/Emergence-resources/actions/runs/43029711953) then passed 12 existing Fairy Ring and 3 new Word ants tests, with both script syntax checks, per Python 3.11 and 3.12; all four test logs inspected. Further revisions must be validated separately. **Release:** Unreleased; no iPhone/Pythonista or power-loss durability claim.
 
 **Acceptance:** A short real CLI run produces a readable image in a disposable directory. A second run at the same path exits with status 2 without replacing the first image. Encoder failures leave no partial final or staging image. If another writer wins the filename race during publication, their bytes remain unchanged. Run both artwork tests on hosted Python 3.11/3.12; preserve the historical rule, grid, palette and drawing logic.
 
@@ -37,4 +37,4 @@ An early `lexists` check avoids spending time drawing when a destination is alre
 
 ## Next
 
-If PR #5 passes the required checks and is safe to merge, record its integration in the PR. Consider an opt-in fresh-filename mode only if there is evidence users need it; do not change historical rule or colour semantics incidentally.
+Track the final integration and exact revision in PR #5. Consider an opt-in fresh-filename mode only if there is evidence users need it; do not change historical rule or colour semantics incidentally.
