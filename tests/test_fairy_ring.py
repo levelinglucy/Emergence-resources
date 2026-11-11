@@ -55,7 +55,7 @@ class FairyRingTests(unittest.TestCase):
 
             self.assertEqual(counts, [1, 0, 2])
             self.assertEqual(len(rings), 3)
-            self.assertTrue(target.read_bytes().startswith(b"\\x89PNG\\r\\n\\x1a\\n"))
+            self.assertTrue(target.read_bytes().startswith(bytes((137, 80, 78, 71, 13, 10, 26, 10))))
             with cipher.Image.open(target) as image:
                 self.assertEqual(image.format, "PNG")
                 self.assertEqual(image.size, (cipher.W, cipher.H))
