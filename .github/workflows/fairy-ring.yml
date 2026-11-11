@@ -20,6 +20,7 @@ jobs:
         with:
           sparse-checkout: |
             the fairy ring cipher
+            Word ants
             tests
           sparse-checkout-cone-mode: false
       - uses: actions/setup-python@v5
@@ -31,3 +32,5 @@ jobs:
         run: |
           python -c "from pathlib import Path; p=Path('the fairy ring cipher'); compile(p.read_text(encoding='utf-8'),str(p),'exec')"
           python -m unittest discover -s tests -p 'test_fairy_ring.py' -v
+          python -c "from pathlib import Path; p=Path('Word ants'); compile(p.read_text(encoding='utf-8'),str(p),'exec')"
+          python -m unittest discover -s tests -p 'test_word_ants.py' -v
