@@ -36,6 +36,32 @@ class FairyRingTests(unittest.TestCase):
         self.assertEqual(cipher.layout([1, 0, 2], random.Random(31)),
                          cipher.layout([1, 0, 2], random.Random(31)))
 
+    def test_disposable_full_canvas_render_with_short_diffusion(self):
+        """Exercise real diffusion, drawing, and exclusive PNG publication together.
+
+        Only the field simulation is shortened to keep CI fast. This is not a
+        visual check of the production 6,000-step reaction-diffusion artwork.
+        """
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as folder:
+            target = Path(folder) / "smoke.png"
+            original_diffusion = cipher.gray_scott
+
+            def quick_field(rings):
+                return original_diffusion(rings, size=32, steps=12)
+
+            with patch.object(cipher, "gray_scott", side_effect=quick_field):
+                counts, rings = cipher.render("A B", str(target))
+
+            self.assertEqual(counts, [1, 0, 2])
+            self.assertEqual(len(rings), 3)
+            self.assertTrue(target.read_bytes().startswith(b"\\x89PNG\\r\\n\\x1a\\n"))
+            with cipher.Image.open(target) as image:
+                self.assertEqual(image.format, "PNG")
+                self.assertEqual(image.size, (cipher.W, cipher.H))
+                image.verify()
+            self.assertEqual([p.name for p in target.parent.iterdir()], ["smoke.png"])
+
     def test_completed_png_saved_without_overwriting_existing_art(self):
         """An earlier generated image must survive a second run unchanged."""
         with tempfile.TemporaryDirectory() as d:

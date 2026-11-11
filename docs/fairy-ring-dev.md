@@ -23,7 +23,12 @@ The previous direct Pillow `save(path)` overwrote an existing picture and could 
 
 Trade-offs: filesystems without hard-link support cannot publish a new image using this method; output is rejected rather than downgraded to potentially destructive replacement. Publication is *not* proof of a durable fsync after power loss, protection from malicious filesystem actors, or a globally atomic directory transaction. Real iPhone/Pythonista behavior and full-size image appearance remain untested. Revisit if a supported device cannot hard-link its output directory or if users need opt-in suffix generation.
 
+## Fast drawing-to-PNG smoke coverage
+
+The disposable test `test_disposable_full_canvas_render_with_short_diffusion` exercises the real ring layout, a **32 × 32, 12-step** Gray–Scott field, the full-size Pillow drawing pipeline and exclusive PNG saving. It verifies a decodable 1600 × 1600 PNG and that no staging files remain. It does not establish the appearance, speed or robustness of the default **400 × 400, 6,000-step** field; there is still no visual certification, iPhone support or power-loss durability evidence. The test writes only to an automatically deleted temporary directory.
+
 ## Unreleased changes
+- Exercise a disposable full-size drawing and exclusive PNG save with deliberately shortened diffusion; production-scale visual output remains unverified.
 - Refuse non-ASCII alphabetic letters and combining marks *before* case conversion; ASCII upper/lowercase, punctuation filtering, image layout and output safety remain unchanged.
 - Publish completed PNGs exclusively via same-directory staging; never truncate previous artwork on reruns or encoder errors.
 - Bound stochastic placement attempts and report unplaceable inputs without producing a misleading image.
