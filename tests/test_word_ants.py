@@ -55,5 +55,23 @@ class WordAntPublicationTests(unittest.TestCase):
             self.assertEqual([p.name for p in Path(folder).iterdir()], ["shared.png"])
 
 
+    def test_compatibility_digits_have_their_numeric_value(self):
+        # Existing ASCII and Arabic-Indic digits keep their values.
+        # Superscripts, circled numerals and circled zero are also isdigit().
+        numbers = ants.numerology("A²٣⑨⓿z")
+        self.assertEqual(numbers, [1, 2, 3, 9, 0, 8])
+        self.assertEqual(ants.rule_from(numbers), "RLRRLL")
+
+    def test_compatibility_digit_draws_a_real_disposable_image(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "unicode.png"
+            with redirect_stderr(io.StringIO()):
+                ants.main(["--steps", "12", "--out", str(path), "A²"])
+            with ants.Image.open(path) as art:
+                self.assertEqual(art.format, "PNG")
+                art.verify()
+            self.assertEqual([p.name for p in Path(folder).iterdir()], ["unicode.png"])
+
+
 if __name__ == "__main__":
     unittest.main()
