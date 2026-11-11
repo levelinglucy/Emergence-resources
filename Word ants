@@ -3,7 +3,8 @@ Word ants: every word is a secret rule, and an ant draws it.
 
 How a word becomes a drawing:
   1. Each letter becomes a number with the old Pythagorean numerology table
-     (A=1 ... I=9, J=1 ... R=9, S=1 ... Z=8). Digits stay as themselves.
+     (A=1 ... I=9, J=1 ... R=9, S=1 ... Z=8). Unicode digits, including
+     superscript and circled digits, become their numeric values (0-9).
   2. Odd numbers mean "turn right" (R), even numbers mean "turn left" (L).
      So the word is now a turning rule, one turn per letter.
   3. An ant walks on an empty grid. Every square has a colour, 0 to n-1,
@@ -35,6 +36,7 @@ import colorsys
 import os
 import sys
 import tempfile
+import unicodedata
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
@@ -50,13 +52,14 @@ DY = (-1, 0, 1, 0)
 
 
 def numerology(word: str) -> list[int]:
-    """Pythagorean numerology: A=1..I=9, J=1..R=9, S=1..Z=8. Digits kept."""
+    """Map ASCII letters to 1..9 and Unicode digits to their 0..9 values."""
     nums = []
     for ch in word.lower():
         if "a" <= ch <= "z":
             nums.append((ord(ch) - ord("a")) % 9 + 1)
         elif ch.isdigit():
-            nums.append(int(ch))
+            # isdigit() includes ² and ⑨, which int() cannot parse.
+            nums.append(unicodedata.digit(ch))
     return nums
 
 
