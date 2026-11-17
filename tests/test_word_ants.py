@@ -73,5 +73,45 @@ class WordAntPublicationTests(unittest.TestCase):
             self.assertEqual([p.name for p in Path(folder).iterdir()], ["unicode.png"])
 
 
+    def test_short_mixed_rule_keeps_compact_byte_cells(self):
+        grid, _, taken = ants.walk("LR", 80, size=32)
+        self.assertIsInstance(grid, bytearray)
+        self.assertEqual(taken, 80)
+
+    def test_257_colour_rule_keeps_states_above_255(self):
+        # A legitimate numerology word with 256 left turns and one right.
+        word = "b" * 256 + "a"
+        rule = ants.rule_from(ants.numerology(word))
+        self.assertEqual(rule, "L" * 256 + "R")
+        grid, _, taken = ants.walk(rule, 1032, size=32)
+        self.assertEqual(taken, 1032)
+        self.assertGreaterEqual(max(grid), 256)
+        self.assertGreaterEqual(grid.itemsize, 2)  # widened cell representation
+
+    def test_65537_colour_rule_uses_at_least_32_bit_cells(self):
+        rule = "L" * 65536 + "R"
+        grid, _, taken = ants.walk(rule, 1032, size=32)
+        self.assertEqual(taken, 1032)
+        self.assertGreaterEqual(max(grid), 256)
+        self.assertGreaterEqual(grid.itemsize, 4)
+
+    def test_257_colour_word_publishes_a_complete_png_once(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "wide.png"
+            args = ["--steps", "1032", "--out", str(path), "b" * 256 + "a"]
+            with redirect_stderr(io.StringIO()):
+                ants.main(args)
+            with ants.Image.open(path) as image:
+                self.assertEqual(image.format, "PNG")
+                self.assertEqual(image.size, (416, 668))
+                image.verify()
+            original = path.read_bytes()
+            with redirect_stderr(io.StringIO()):
+                with self.assertRaises(SystemExit):
+                    ants.main(args)
+            self.assertEqual(path.read_bytes(), original)
+            self.assertEqual([p.name for p in Path(folder).iterdir()], ["wide.png"])
+
+
 if __name__ == "__main__":
     unittest.main()
