@@ -31,6 +31,7 @@ replace earlier art. See docs/word-ants-dev.md for tests and portability limits.
 """
 from __future__ import annotations
 
+from array import array
 import argparse
 import colorsys
 import os
@@ -68,10 +69,23 @@ def rule_from(nums: list[int]) -> str:
 
 
 def walk(rule: str, steps: int, size: int = GRID):
-    """Run the ant. Returns the grid (flat list), its bounding box and steps taken."""
+    """Run the ant. Returns flat colour cells, bounds, and steps taken."""
     n = len(rule)
     turn = [1 if c == "R" else -1 for c in rule]
-    grid = bytearray(size * size)
+    # Colour indices must fit the rule, not just the first 256 states.
+    # Keep the compact original representation for ordinary short words.
+    cells = size * size
+    if n <= 256:
+        grid = bytearray(cells)
+    elif n <= 65536:
+        grid = array("H", [0]) * cells
+    else:
+        wide = array("I", [0])
+        if wide.itemsize < 4:  # Some platforms permit 16-bit unsigned int.
+            wide = array("L", [0])
+        if n > 1 << (8 * wide.itemsize):
+            raise ValueError("rule has too many colour states for cell storage")
+        grid = wide * cells
     x = y = size // 2
     d = 0
     minx = maxx = x

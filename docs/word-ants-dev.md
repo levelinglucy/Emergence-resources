@@ -2,7 +2,7 @@
 
 ## Goal and status
 
-**Goal:** Preserve the numerology-to-turmite drawing algorithm, gallery and safe artwork publication while allowing every Unicode character recognized by `str.isdigit()` to become its numeric value without crashing image generation.
+**Goal:** Preserve the numerology-to-turmite drawing algorithm, gallery and safe artwork publication while interpreting Unicode `isdigit()` characters correctly and supporting mixed turning rules whose colour indices exceed a byte without crashing image generation.
 
 **Integration and validation:** Artwork preservation was merged in [PR #5](https://github.com/levelinglucy/Emergence-resources/pull/5). [PR #6](https://github.com/levelinglucy/Emergence-resources/pull/6) is the authoritative record for the Unicode digit change's integration status and revision-specific green checks. Test-first `4fedb72f` demonstrated two new `ValueError` failures per Python 3.11 and 3.12 run while all 12 Fairy Ring and three previous Word ants tests passed ([red CI](https://github.com/levelinglucy/Emergence-resources/actions/runs/43118835744)). **Publication:** no verified release or iPhone/Pythonista or power-loss durability claim.
 
@@ -25,6 +25,16 @@ The original script's introductory command examples named a nonexistent filename
 
 Previously `numerology()` called `int(ch)` whenever `ch.isdigit()` was true. Python's `isdigit()` also accepts superscripts and circled digits, but `int()` does not, so otherwise valid words could crash image generation before publication. We now use `unicodedata.digit(ch)` for every `isdigit()` character, retaining decimal values and accepting compatibility digits. Ordinary letters, signs and unsupported numeric symbols (such as the circled number `⑩`, which is not a single digit) retain their prior treatment. The word's characters are not rewritten or normalized; only the numeric rule is derived. This is a compatibility broadening for input characters, not a rule or art-renderer redesign. Reconsider only if a concrete ambiguity requires a stricter documented ASCII-only mode.
 
+## Long mixed-rule colour states (2026-11-17)
+
+The original ant grid always used one byte per square. However the rule length determines the colour range: a valid 257-character mixed turning rule needs state 256 after enough revisits, and the original writer raises `ValueError: byte must be in range(0, 256)` before an image can be published. A test-first failure on the exact source was observed for 257- and 65,537-state rules, including a full disposable PNG attempt ([red hosted regression](https://github.com/levelinglucy/Emergence-resources/actions/runs/44135922367)).
+
+**Decision:** Preserve `bytearray` for rules of up to 256 symbols, switch to `array('H')` for 257–65,536 states, and use a verified at-least-32-bit unsigned array for longer rules. The ant's coordinates, turn sequence, modular state update, palette and publish-exclusively protocol are unchanged. If a rule exceeds the chosen native array's representable state range, explicitly reject it rather than silently wrap. This increases world-grid memory from approximately 1.44 MB to 2.88 MB for the 16-bit tier, and normally 5.76 MB for the 32-bit tier (native `itemsize` is platform-dependent).
+
+**Validation contract:** Compare short-rule output type, 257-state advancement above byte range, 65,537-state storage width, real 257-letter PNG creation, second-run refusal, and preexisting Fairy Ring/Word ants regressions. [PR #7](https://github.com/levelinglucy/Emergence-resources/pull/7) holds revision-specific merge and hosted-test evidence; do not infer a tagged release from PR or source integration.
+
+**Limits:** No iPhone/Pythonista, huge-rule practical performance, memory-pressure, adversarial word, non-PNG publication, power-loss or hardware-rendering certification. `array('L')` is used only if `array('I')` is too narrow on the host. This does not change user artwork or historical output.
+
 ## Publication decision
 
 Earlier, `sheet.save(args.out)` directly opened an existing output for writing and could truncate it before completing the new image. The repaired path stages the new image under a unique hidden file in the destination directory. Pillow still chooses format from the requested extension, so custom supported formats retain their prior behaviour; the default remains PNG. After encoding completes, `os.link` creates the final name exclusively. The stage is removed on success and on handled failure.
@@ -34,6 +44,8 @@ An early `lexists` check avoids spending time drawing when a destination is alre
 **Trade-offs:** This fails closed on output directories/filesystems where hard links are unavailable; no unsafe overwrite fallback is used. Same-directory publication is not a durable `fsync` transaction, does not prevent hostile directory races, and does not prove that a full production gallery renders well or that Pythonista supports hard links. Those require separate evidence and may motivate a different, explicitly scoped publication design.
 
 ## Unreleased changes
+
+- Support mixed rules with more than 256 colour states by using wider unsigned cell storage, retaining the byte grid for ordinary rules; reject unrepresentable lengths instead of overflowing. 
 
 - Decode Unicode superscript and circled single digits consistently with decimal digits, avoiding `ValueError` during rendering; keep original rule, visual algorithm and safe publication.
 
