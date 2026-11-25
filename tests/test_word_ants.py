@@ -173,12 +173,33 @@ class WordAntCaptionTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / "labels.png"
             with redirect_stderr(io.StringIO()):
-                ants.main(["--steps", "12", "--out", str(path), *words])
+                ants.main(["--steps", "12", "--embed-inputs", "--out", str(path), *words])
             with ants.Image.open(path) as art:
                 self.assertEqual(json.loads(art.info["word_ants_inputs"]), words)
                 self.assertEqual(art.size, (1212, 668))
                 art.verify()
             self.assertEqual([p.name for p in Path(folder).iterdir()], ["labels.png"])
+
+    def test_png_default_does_not_embed_original_inputs(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "private.png"
+            with redirect_stderr(io.StringIO()):
+                ants.main(["--steps", "12", "--out", str(path), "b" * 256 + "a"])
+            with ants.Image.open(path) as art:
+                self.assertNotIn("word_ants_inputs", art.info)
+                art.verify()
+
+    def test_embed_inputs_requires_png_before_rendering(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "labels.jpg"
+            stderr = io.StringIO()
+            with redirect_stderr(stderr), patch.object(ants, "render_panel") as render:
+                with self.assertRaises(SystemExit) as exc:
+                    ants.main(["--embed-inputs", "--out", str(path), "ember"])
+            self.assertEqual(exc.exception.code, 2)
+            self.assertIn("--embed-inputs requires PNG output", stderr.getvalue())
+            render.assert_not_called()
+            self.assertEqual(list(Path(folder).iterdir()), [])
 
     def test_non_png_output_still_uses_requested_format(self):
         with tempfile.TemporaryDirectory() as folder:
