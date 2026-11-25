@@ -2,6 +2,7 @@
 import importlib.machinery
 import importlib.util
 import io
+import json
 from contextlib import redirect_stderr
 from pathlib import Path
 import tempfile
@@ -147,6 +148,47 @@ class WordAntCaptionTests(unittest.TestCase):
                     for other, (ol, ot, or_, ob) in labels[i+1:]:
                         self.assertFalse(l < or_ and ol < r and t < ob and ot < b,
                                          (a, other))
+
+    def test_long_previews_mark_truncation_with_default_fonts(self):
+        word = "b" * 256 + "a"
+        for fonts in (
+            (ants.ImageFont.load_default(),) * 3,
+            (ants.ImageFont.truetype("DejaVuSans.ttf", 30),
+             ants.ImageFont.truetype("DejaVuSans.ttf", 18),
+             ants.ImageFont.truetype("DejaVuSansMono.ttf", 17)),
+        ):
+            panel, labels = self.capture_captions(word, fonts)
+            self.assertEqual(len(labels), 4)
+            self.assertEqual(sum(text.endswith("...") for text, _ in labels), 3)
+            self.assertIn("1,032 steps", [text for text, _ in labels])
+            for text, (l, t, r, b) in labels:
+                self.assertTrue(14 <= l <= r <= panel.width - 14, text)
+                self.assertTrue(380 <= t <= b <= panel.height, text)
+            for i, (_, (l, t, r, b)) in enumerate(labels):
+                for _, (ol, ot, or_, ob) in labels[i + 1:]:
+                    self.assertFalse(l < or_ and ol < r and t < ob and ot < b)
+
+    def test_png_metadata_recovers_full_ordered_inputs(self):
+        words = ["b" * 256 + "a", "A²\nB", "A²\nB"]
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "labels.png"
+            with redirect_stderr(io.StringIO()):
+                ants.main(["--steps", "12", "--out", str(path), *words])
+            with ants.Image.open(path) as art:
+                self.assertEqual(json.loads(art.info["word_ants_inputs"]), words)
+                self.assertEqual(art.size, (1212, 668))
+                art.verify()
+            self.assertEqual([p.name for p in Path(folder).iterdir()], ["labels.png"])
+
+    def test_non_png_output_still_uses_requested_format(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "labels.jpg"
+            with redirect_stderr(io.StringIO()):
+                ants.main(["--steps", "12", "--out", str(path), "ember"])
+            with ants.Image.open(path) as art:
+                self.assertEqual(art.format, "JPEG")
+                self.assertEqual(art.size, (416, 668))
+                art.verify()
 
     def test_short_caption_preserves_original_text(self):
         panel, labels = self.capture_captions("ember", ants.load_fonts())
