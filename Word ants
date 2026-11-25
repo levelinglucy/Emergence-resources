@@ -24,6 +24,7 @@ Usage:
     python3 "Word ants"                      # the gallery
     python3 "Word ants" spiral fractal 1995   # your own words
     python3 "Word ants" --steps 300000 ember
+    python3 "Word ants" --embed-inputs ember  # opt in to full PNG input metadata
 
 Needs Pillow (pip install pillow). Writes word-ants.png next to the script.
 Completed images are published only at unused output paths; reruns refuse to
@@ -133,7 +134,7 @@ def draw_caption(draw, text, font, fill, panel, top, height, *, right=False):
         return r - l <= width and b - t <= height
 
     # Limit the length of strings passed to the font engine, including
-    # zero-width characters. The full input remains available separately.
+    # zero-width characters. The full input is unchanged for the simulation.
     limit = max(0, width * 2)
     if len(text) > limit or not fits(text):
         marker = "..."
@@ -255,8 +256,12 @@ def main(argv=None):
     ap.add_argument("words", nargs="*", help="words or numbers to draw")
     ap.add_argument("--steps", type=int, default=DEFAULT_STEPS)
     ap.add_argument("--out", default=str(Path(__file__).with_name("word-ants.png")))
+    ap.add_argument("--embed-inputs", action="store_true",
+                    help="embed full original inputs in PNG metadata (may reveal hidden text)")
     args = ap.parse_args(argv)
 
+    if args.embed_inputs and Image.registered_extensions().get(Path(args.out).suffix.lower()) != "PNG":
+        ap.error("--embed-inputs requires PNG output")
     if os.path.lexists(args.out):
         ap.error(f"output already exists: {args.out}")
 
@@ -283,7 +288,7 @@ def main(argv=None):
            fill=(90, 90, 100), anchor="rs")
     try:
         metadata = None
-        if Image.registered_extensions().get(Path(args.out).suffix.lower()) == "PNG":
+        if args.embed_inputs:
             metadata = PngImagePlugin.PngInfo()
             # JSON preserves order, duplicates, Unicode and control characters.
             metadata.add_text("word_ants_inputs", json.dumps(words, ensure_ascii=True))
