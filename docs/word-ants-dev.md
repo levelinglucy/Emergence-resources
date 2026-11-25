@@ -2,7 +2,7 @@
 
 ## Goal and status
 
-**Goal:** Preserve the numerology-to-turmite drawing algorithm, gallery and safe artwork publication while interpreting Unicode `isdigit()` characters correctly and supporting mixed turning rules whose colour indices exceed a byte without crashing image generation.
+**Goal:** Preserve the numerology-to-turmite drawing algorithm, gallery and safe artwork publication while interpreting Unicode `isdigit()` characters correctly and supporting mixed turning rules whose colour indices exceed a byte without crashing image generation. Keep long captions readable without changing the underlying simulation or sheet dimensions.
 
 **Integration and validation:** Artwork preservation was merged in [PR #5](https://github.com/levelinglucy/Emergence-resources/pull/5). [PR #6](https://github.com/levelinglucy/Emergence-resources/pull/6) is the authoritative record for the Unicode digit change's integration status and revision-specific green checks. Test-first `4fedb72f` demonstrated two new `ValueError` failures per Python 3.11 and 3.12 run while all 12 Fairy Ring and three previous Word ants tests passed ([red CI](https://github.com/levelinglucy/Emergence-resources/actions/runs/43118835744)). **Publication:** no verified release or iPhone/Pythonista or power-loss durability claim.
 
@@ -35,6 +35,25 @@ The original ant grid always used one byte per square. However the rule length d
 
 **Limits:** No iPhone/Pythonista, huge-rule practical performance, memory-pressure, adversarial word, non-PNG publication, power-loss or hardware-rendering certification. `array('L')` is used only if `array('I')` is too narrow on the host. This does not change user artwork or historical output.
 
+## Measured caption previews (2026-11-25)
+
+[Draft PR #8](https://github.com/levelinglucy/Emergence-resources/pull/8) investigates long inputs whose captions previously clipped or collided with the steps label. The test-only predecessor's [hosted run](https://github.com/levelinglucy/Emergence-resources/actions/runs/45585160260) reproduces both problems on Python 3.11 and 3.12. Candidate validation and integration are recorded in the PR; no release is implied.
+
+**Decision:** Preserve the existing 380-pixel panel and 92-pixel caption area. Use four separately measured rows (word, digits, rule, steps); place measured ink within its row with 14-pixel horizontal margins. Fit a prefix and explicit ASCII `...` when a caption does not fit, including an upper bound on text sent to the font engine. Escape non-printing characters in the word preview. This is a prefix preview, not a Unicode grapheme-aware layout or guaranteed maximal prefix. Short labels retain their content but move vertically. The simulation, crop, palette, gallery dimensions and exclusive output publication remain unchanged.
+
+**Full input retrieval:** New PNG output embeds the ordered original input strings (including repeats) as JSON in the text key `word_ants_inputs`. For example:
+
+```python
+import json
+from PIL import Image
+with Image.open("ember.png") as image:
+    print(json.loads(image.info["word_ants_inputs"]))
+```
+
+Use the existing numerology and rule functions to reconstruct full digits and turns. This metadata can reveal input characters not visible in the caption; remove metadata before sharing if the inputs are private. Metadata can be stripped by other software and is not authentication. Other supported output formats retain their normal encoding and do not receive this PNG-specific field: retain the original command/inputs or use PNG when exact retrieval is important. Existing files are never rewritten.
+
+**Acceptance:** Verify the test-first overlap and clipping failures, bounds and explicit markers for long labels under TrueType and default fonts, exact short label text, original ordered PNG inputs and non-PNG encoding, unchanged dimensions and existing publication and simulation tests. The sheet-wide heading/subheading, arbitrary glyph shaping, device fonts and metadata retention through third-party image processing are outside this panel-caption repair.
+
 ## Publication decision
 
 Earlier, `sheet.save(args.out)` directly opened an existing output for writing and could truncate it before completing the new image. The repaired path stages the new image under a unique hidden file in the destination directory. Pillow still chooses format from the requested extension, so custom supported formats retain their prior behaviour; the default remains PNG. After encoding completes, `os.link` creates the final name exclusively. The stage is removed on success and on handled failure.
@@ -44,6 +63,8 @@ An early `lexists` check avoids spending time drawing when a destination is alre
 **Trade-offs:** This fails closed on output directories/filesystems where hard links are unavailable; no unsafe overwrite fallback is used. Same-directory publication is not a durable `fsync` transaction, does not prevent hostile directory races, and does not prove that a full production gallery renders well or that Pythonista supports hard links. Those require separate evidence and may motivate a different, explicitly scoped publication design.
 
 ## Unreleased changes
+
+- Fit Word ants caption previews into separate rows, marking truncated labels and embedding the full ordered inputs in new PNG output; preserve the original dimensions and simulation.
 
 - Support mixed rules with more than 256 colour states by using wider unsigned cell storage, retaining the byte grid for ordinary rules; reject unrepresentable lengths instead of overflowing. 
 
