@@ -41,7 +41,7 @@ The original ant grid always used one byte per square. However the rule length d
 
 **Decision:** Preserve the existing 380-pixel panel and 92-pixel caption area. Use four separately measured rows (word, digits, rule, steps); place measured ink within its row with 14-pixel horizontal margins. Fit a prefix and explicit ASCII `...` when a caption does not fit, including an upper bound on text sent to the font engine. Escape non-printing characters in the word preview. This is a prefix preview, not a Unicode grapheme-aware layout or guaranteed maximal prefix. Short labels retain their content but move vertically. The simulation, crop, palette, gallery dimensions and exclusive output publication remain unchanged.
 
-**Full input retrieval:** New PNG output embeds the ordered original input strings (including repeats) as JSON in the text key `word_ants_inputs`. For example:
+**Full input retrieval (opt-in):** Ordinary PNG output does not embed the original input strings. Add `--embed-inputs` to intentionally store the ordered originals (including repeats) as JSON in the PNG text key `word_ants_inputs`. For example, create a new image with `python3 "Word ants" --embed-inputs ember --out ember.png`, then read it with:
 
 ```python
 import json
@@ -50,9 +50,9 @@ with Image.open("ember.png") as image:
     print(json.loads(image.info["word_ants_inputs"]))
 ```
 
-Use the existing numerology and rule functions to reconstruct full digits and turns. This metadata can reveal input characters not visible in the caption; remove metadata before sharing if the inputs are private. Metadata can be stripped by other software and is not authentication. Other supported output formats retain their normal encoding and do not receive this PNG-specific field: retain the original command/inputs or use PNG when exact retrieval is important. Existing files are never rewritten.
+Use the existing numerology and rule functions to reconstruct full digits and turns. This metadata can reveal input characters not visible in the caption. Opt-in rather than default storage preserves the previous publication boundary and avoids surprising disclosure when sharing art; ordinary images still show visible captions and derived artwork, so they are not anonymous. Metadata can be stripped by other software and is not authentication. Other supported output formats retain their normal encoding; requesting `--embed-inputs` with a non-PNG destination is rejected before rendering. Retain the original command/inputs separately if exact retrieval is important. Existing files are never rewritten.
 
-**Acceptance:** Verify the test-first overlap and clipping failures, bounds and explicit markers for long labels under TrueType and default fonts, exact short label text, original ordered PNG inputs and non-PNG encoding, unchanged dimensions and existing publication and simulation tests. The sheet-wide heading/subheading, arbitrary glyph shaping, device fonts and metadata retention through third-party image processing are outside this panel-caption repair.
+**Acceptance:** Verify the test-first overlap and clipping failures, bounds and explicit markers for long labels under TrueType and default fonts, exact short label text, explicit ordered PNG input round-trip, default absence of that field, early non-PNG opt-in refusal and ordinary non-PNG encoding, unchanged dimensions and existing publication and simulation tests. The sheet-wide heading/subheading, arbitrary glyph shaping, device fonts and metadata retention through third-party image processing are outside this panel-caption repair.
 
 ## Publication decision
 
@@ -64,7 +64,7 @@ An early `lexists` check avoids spending time drawing when a destination is alre
 
 ## Unreleased changes
 
-- Fit Word ants caption previews into separate rows, marking truncated labels and embedding the full ordered inputs in new PNG output; preserve the original dimensions and simulation.
+- Fit Word ants caption previews into separate rows, marking truncated labels and optionally embedding the full ordered inputs in PNG output via `--embed-inputs`; preserve the original dimensions and simulation.
 
 - Support mixed rules with more than 256 colour states by using wider unsigned cell storage, retaining the byte grid for ordinary rules; reject unrepresentable lengths instead of overflowing. 
 
