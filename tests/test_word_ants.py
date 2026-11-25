@@ -2,6 +2,7 @@
 import importlib.machinery
 import importlib.util
 import io
+import json
 from contextlib import redirect_stderr
 from pathlib import Path
 import tempfile
@@ -111,6 +112,113 @@ class WordAntPublicationTests(unittest.TestCase):
                     ants.main(args)
             self.assertEqual(path.read_bytes(), original)
             self.assertEqual([p.name for p in Path(folder).iterdir()], ["wide.png"])
+
+
+
+class WordAntCaptionTests(unittest.TestCase):
+    def capture_captions(self, word, fonts):
+        # Observe real drawing calls, measuring using the very same fonts,
+        # positions and anchors. The original renderer still produces pixels.
+        original = ants.ImageDraw.ImageDraw.text
+        labels = []
+        def observe(draw, xy, text, *args, **kwargs):
+            if xy[1] >= 380:
+                bounds = draw.textbbox(xy, text, font=kwargs["font"],
+                                       anchor=kwargs.get("anchor"))
+                labels.append((text, bounds))
+            return original(draw, xy, text, *args, **kwargs)
+        with patch.object(ants.ImageDraw.ImageDraw, "text", observe):
+            panel = ants.render_panel(word, 1032, 380, fonts)
+        return panel, labels
+
+    def test_long_caption_calls_fit_without_overlap(self):
+        fonts = (ants.ImageFont.truetype("DejaVuSans.ttf", 30),
+                 ants.ImageFont.truetype("DejaVuSans.ttf", 18),
+                 ants.ImageFont.truetype("DejaVuSansMono.ttf", 17))
+        for word in ("interoperability", "b" * 256 + "a"):
+            with self.subTest(word=word):
+                panel, labels = self.capture_captions(word, fonts)
+                self.assertEqual(len(labels), 4)
+                for text, (left, top, right, bottom) in labels:
+                    self.assertTrue(0 <= left <= right <= panel.width,
+                                    (text, left, right))
+                    self.assertTrue(380 <= top <= bottom <= panel.height,
+                                    (text, top, bottom))
+                for i, (a, (l, t, r, b)) in enumerate(labels):
+                    for other, (ol, ot, or_, ob) in labels[i+1:]:
+                        self.assertFalse(l < or_ and ol < r and t < ob and ot < b,
+                                         (a, other))
+
+    def test_long_previews_mark_truncation_with_default_fonts(self):
+        word = "b" * 256 + "a"
+        for fonts in (
+            (ants.ImageFont.load_default(),) * 3,
+            (ants.ImageFont.truetype("DejaVuSans.ttf", 30),
+             ants.ImageFont.truetype("DejaVuSans.ttf", 18),
+             ants.ImageFont.truetype("DejaVuSansMono.ttf", 17)),
+        ):
+            panel, labels = self.capture_captions(word, fonts)
+            self.assertEqual(len(labels), 4)
+            self.assertEqual(sum(text.endswith("...") for text, _ in labels), 3)
+            self.assertIn("1,032 steps", [text for text, _ in labels])
+            for text, (l, t, r, b) in labels:
+                self.assertTrue(14 <= l <= r <= panel.width - 14, text)
+                self.assertTrue(380 <= t <= b <= panel.height, text)
+            for i, (_, (l, t, r, b)) in enumerate(labels):
+                for _, (ol, ot, or_, ob) in labels[i + 1:]:
+                    self.assertFalse(l < or_ and ol < r and t < ob and ot < b)
+
+    def test_png_metadata_recovers_full_ordered_inputs(self):
+        words = ["b" * 256 + "a", "A²\nB", "A²\nB"]
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "labels.png"
+            with redirect_stderr(io.StringIO()):
+                ants.main(["--steps", "12", "--embed-inputs", "--out", str(path), *words])
+            with ants.Image.open(path) as art:
+                self.assertEqual(json.loads(art.info["word_ants_inputs"]), words)
+                self.assertEqual(art.size, (1212, 668))
+                art.verify()
+            self.assertEqual([p.name for p in Path(folder).iterdir()], ["labels.png"])
+
+    def test_png_default_does_not_embed_original_inputs(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "private.png"
+            with redirect_stderr(io.StringIO()):
+                ants.main(["--steps", "12", "--out", str(path), "b" * 256 + "a"])
+            with ants.Image.open(path) as art:
+                self.assertNotIn("word_ants_inputs", art.info)
+                art.verify()
+
+    def test_embed_inputs_requires_png_before_rendering(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "labels.jpg"
+            stderr = io.StringIO()
+            with redirect_stderr(stderr), patch.object(ants, "render_panel") as render:
+                with self.assertRaises(SystemExit) as exc:
+                    ants.main(["--embed-inputs", "--out", str(path), "ember"])
+            self.assertEqual(exc.exception.code, 2)
+            self.assertIn("--embed-inputs requires PNG output", stderr.getvalue())
+            render.assert_not_called()
+            self.assertEqual(list(Path(folder).iterdir()), [])
+
+    def test_non_png_output_still_uses_requested_format(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "labels.jpg"
+            with redirect_stderr(io.StringIO()):
+                ants.main(["--steps", "12", "--out", str(path), "ember"])
+            with ants.Image.open(path) as art:
+                self.assertEqual(art.format, "JPEG")
+                self.assertEqual(art.size, (416, 668))
+                art.verify()
+
+    def test_short_caption_preserves_original_text(self):
+        panel, labels = self.capture_captions("ember", ants.load_fonts())
+        texts = [text for text, _ in labels]
+        nums = ants.numerology("ember")
+        self.assertIn("ember", texts)
+        self.assertIn(" ".join(map(str, nums)), texts)
+        self.assertIn(ants.rule_from(nums), texts)
+        self.assertEqual(panel.width, 380)
 
 
 if __name__ == "__main__":
