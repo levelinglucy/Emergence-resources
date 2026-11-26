@@ -226,6 +226,53 @@ def load_fonts():
             pick(["SourceCodePro-Regular.ttf", "DejaVuSansMono.ttf"], 17))
 
 
+def draw_sheet_heading(draw, width, gap, fonts):
+    """Fit complete fixed heading text inside the existing 120 px header."""
+    available = width - 2 * gap
+
+    def bounds(text, font):
+        return draw.textbbox((0, 0), text, font=font, anchor="ls")
+
+    def fits(text, font, height):
+        l, t, r, b = bounds(text, font)
+        return r - l <= available and b - t <= height
+
+    def place(text, font, top, height, fill):
+        if not fits(text, font, height):
+            raise ValueError("sheet heading does not fit its row")
+        l, t, r, b = bounds(text, font)
+        draw.text((gap - l, top + (height - (b - t)) // 2 - t),
+                  text, font=font, fill=fill, anchor="ls")
+
+    heading = "What does a word draw?"
+    title = fonts[0]
+    # Keep the large title on wide sheets; use a smaller face on narrow ones.
+    # The built-in fallback is already small and may not be resizable.
+    if isinstance(getattr(title, "path", None), (str, bytes, os.PathLike)):
+        for size in range(44, 0, -1):
+            candidate = ImageFont.truetype(title.path, size)
+            if fits(heading, candidate, 44):
+                title = candidate
+                break
+    place(heading, title, 8, 44, (240, 240, 245))
+
+    small = fonts[1]
+    # Built-in fallback fonts need not support the Unicode arrow glyph.
+    arrow = " → " if isinstance(getattr(small, "path", None),
+                                 (str, bytes, os.PathLike)) else " -> "
+    phrases = ("letter", "numerology digit", "odd turns right, even turns left",
+               "an ant walks the rule")
+    subtitle = arrow.join(phrases)
+    colour = (150, 150, 160)
+    if fits(subtitle, small, 60):
+        place(subtitle, small, 56, 60, colour)
+    else:
+        lines = (arrow.join(phrases[:2]) + arrow.rstrip(),
+                 phrases[2] + arrow.rstrip(), phrases[3])
+        for i, line in enumerate(lines):
+            place(line, small, 56 + i * 20, 20, colour)
+
+
 def save_png_exclusively(image: Image.Image, target: str | Path, *, pnginfo=None) -> None:
     """Stage a complete image then publish at a new filename, never replace.
 
@@ -275,10 +322,7 @@ def main(argv=None):
     H = head + rows * (panel + 92) + (rows + 1) * gap + 40
     sheet = Image.new("RGB", (W, H), (8, 8, 12))
     d = ImageDraw.Draw(sheet)
-    title = ImageFont.truetype(fonts[0].path, 44) if hasattr(fonts[0], "path") else fonts[0]
-    d.text((gap, 62), "What does a word draw?", font=title, fill=(240, 240, 245), anchor="ls")
-    d.text((gap, 98), "letter \u2192 numerology digit \u2192 odd turns right, even turns left \u2192 an ant walks the rule",
-           font=fonts[1], fill=(150, 150, 160), anchor="ls")
+    draw_sheet_heading(d, W, gap, fonts)
     for k, w in enumerate(words):
         r, c = divmod(k, cols)
         print(f"drawing {w!r} ...", file=sys.stderr)
