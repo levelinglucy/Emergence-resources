@@ -211,6 +211,41 @@ class WordAntCaptionTests(unittest.TestCase):
                 self.assertEqual(art.size, (416, 668))
                 art.verify()
 
+    def test_sheet_headings_fit_each_gallery_width(self):
+        # Measure actual sheet text calls with a fixed, commonly installed font.
+        # Panel captions are below y=380; these mixed rules have no loop notice.
+        fonts = (ants.ImageFont.truetype("DejaVuSans.ttf", 30),
+                 ants.ImageFont.truetype("DejaVuSans.ttf", 18),
+                 ants.ImageFont.truetype("DejaVuSansMono.ttf", 17))
+        original = ants.ImageDraw.ImageDraw.text
+        for words in (["ember"], ["ember", "tide"], ["ember", "tide", "echo"]):
+            with self.subTest(words=words), tempfile.TemporaryDirectory() as folder:
+                calls = []
+                def observe(draw, xy, text, *args, **kwargs):
+                    if xy[1] < 120:
+                        bounds = draw.textbbox(xy, text, font=kwargs["font"],
+                                               anchor=kwargs.get("anchor"))
+                        calls.append((text, bounds))
+                    return original(draw, xy, text, *args, **kwargs)
+                path = Path(folder) / "headings.png"
+                with patch.object(ants, "load_fonts", return_value=fonts), \
+                     patch.object(ants.ImageDraw.ImageDraw, "text", observe), \
+                     redirect_stderr(io.StringIO()):
+                    ants.main(["--steps", "12", "--out", str(path), *words])
+                with ants.Image.open(path) as art:
+                    self.assertEqual(art.size, (398 * len(words) + 18, 668))
+                    width = art.width
+                    art.verify()
+                self.assertIn("What does a word draw?", [text for text, _ in calls])
+                self.assertGreaterEqual(len(calls), 2)
+                for text, (l, t, r, b) in calls:
+                    self.assertTrue(0 <= l <= r <= width and 0 <= t <= b <= 120,
+                                    (text, (l, t, r, b), width))
+                for i, (a, (l, t, r, b)) in enumerate(calls):
+                    for other, (ol, ot, or_, ob) in calls[i + 1:]:
+                        self.assertFalse(l < or_ and ol < r and t < ob and ot < b,
+                                         (a, other))
+
     def test_short_caption_preserves_original_text(self):
         panel, labels = self.capture_captions("ember", ants.load_fonts())
         texts = [text for text, _ in labels]
