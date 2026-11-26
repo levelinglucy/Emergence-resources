@@ -54,6 +54,14 @@ Use the existing numerology and rule functions to reconstruct full digits and tu
 
 **Acceptance:** Verify the test-first overlap and clipping failures, bounds and explicit markers for long labels under TrueType and default fonts, exact short label text, explicit ordered PNG input round-trip, default absence of that field, early non-PNG opt-in refusal and ordinary non-PNG encoding, unchanged dimensions and existing publication and simulation tests. The sheet-wide heading/subheading, arbitrary glyph shaping, device fonts and metadata retention through third-party image processing are outside this panel-caption repair.
 
+## Sheet heading layout (2026-11-26)
+
+[PR #9](https://github.com/levelinglucy/Emergence-resources/pull/9) extends the earlier panel-caption repair to the fixed 120-pixel sheet header. Its test-only predecessor failed for a 416-pixel single-panel gallery on both hosted Python versions: the title's measured right edge was 562 ([red CI](https://github.com/levelinglucy/Emergence-resources/actions/runs/45747994001)); the two- and three-panel cases passed.
+
+**Decision:** Keep the full title, choose the largest fitting size up to 44 for the installed scalable title face, and place measured ink with 18-pixel side margins. Use the complete explanatory subtitle on one line when it fits, otherwise split it at its existing logical transitions into three rows. Built-in fallback fonts retain their small size and use ASCII arrows so the explanation does not depend on Unicode arrow support. Unlike variable input captions, fixed heading text is never shortened. If a heading cannot fit its allotted row, fail explicitly rather than publishing clipped text. The existing canvas, panel positions, movement, palette, metadata opt-in and exclusive publication are unchanged.
+
+**Acceptance:** Real disposable PNGs at each of the three gallery widths, with DejaVu, built-in defaults and the platform-selected fonts; verify exact heading and complete subtitle text (equivalent arrow spelling), ink bounds and nonoverlap, original dimensions and existing output tests. See PR #9 for revision-specific validation and integration; no release, all-font, mobile or power-loss certification is implied.
+
 ## Publication decision
 
 Earlier, `sheet.save(args.out)` directly opened an existing output for writing and could truncate it before completing the new image. The repaired path stages the new image under a unique hidden file in the destination directory. Pillow still chooses format from the requested extension, so custom supported formats retain their prior behaviour; the default remains PNG. After encoding completes, `os.link` creates the final name exclusively. The stage is removed on success and on handled failure.
@@ -63,6 +71,8 @@ An early `lexists` check avoids spending time drawing when a destination is alre
 **Trade-offs:** This fails closed on output directories/filesystems where hard links are unavailable; no unsafe overwrite fallback is used. Same-directory publication is not a durable `fsync` transaction, does not prevent hostile directory races, and does not prove that a full production gallery renders well or that Pythonista supports hard links. Those require separate evidence and may motivate a different, explicitly scoped publication design.
 
 ## Unreleased changes
+
+- Fit the complete sheet title and explanation within the existing header of narrow and wide galleries; preserve the original artwork dimensions.
 
 - Fit Word ants caption previews into separate rows, marking truncated labels and optionally embedding the full ordered inputs in PNG output via `--embed-inputs`; preserve the original dimensions and simulation.
 
