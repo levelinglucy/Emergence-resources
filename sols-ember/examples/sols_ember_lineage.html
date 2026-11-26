@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Sol&#x27;s Ember</title>
+  <style>
+    :root {
+      --night: #080610;
+      --ink: #eeebf7;
+      --muted: #aaa3bd;
+      --violet: #9f72ff;
+      --violet-deep: #50308e;
+      --gold: #ffca67;
+      --ember: #ff754a;
+      --green: #71d6ae;
+      --panel: rgba(23, 17, 38, .78);
+      --line: rgba(190, 166, 255, .18);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 72% 8%, rgba(150, 88, 255, .18), transparent 32rem),
+        radial-gradient(circle at 16% 30%, rgba(255, 115, 68, .10), transparent 28rem),
+        var(--night);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      min-height: 100vh;
+    }
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      opacity: .22;
+      background-image: radial-gradient(rgba(255,255,255,.22) .7px, transparent .7px);
+      background-size: 23px 23px;
+      mask-image: linear-gradient(to bottom, black, transparent 75%);
+    }
+    main { width: min(1180px, calc(100% - 32px)); margin: 0 auto; padding: 52px 0 72px; }
+    .eyebrow { color: var(--gold); text-transform: uppercase; letter-spacing: .2em; font-size: .72rem; font-weight: 800; }
+    h1 { font-size: clamp(2.7rem, 8vw, 6.4rem); line-height: .9; letter-spacing: -.07em; margin: 15px 0 20px; }
+    h1 span { color: transparent; background: linear-gradient(100deg, var(--gold), var(--ember), var(--violet)); background-clip: text; }
+    .lede { max-width: 720px; color: var(--muted); font-size: clamp(1rem, 2vw, 1.2rem); line-height: 1.7; }
+    .notice { border-left: 2px solid var(--violet); padding: 2px 0 2px 18px; margin: 28px 0 0; color: #c9c1db; max-width: 850px; }
+    .overview { display: grid; grid-template-columns: 1.3fr .7fr; gap: 18px; margin-top: 34px; }
+    .panel { border: 1px solid var(--line); background: var(--panel); box-shadow: 0 20px 60px rgba(0,0,0,.24); border-radius: 22px; backdrop-filter: blur(14px); }
+    .orbit { position: relative; min-height: 360px; overflow: hidden; }
+    canvas { display: block; width: 100%; height: 360px; }
+    .orbit-label { position: absolute; left: 22px; top: 20px; color: var(--muted); font-size: .78rem; letter-spacing: .12em; text-transform: uppercase; }
+    .quote { padding: 34px; display: flex; flex-direction: column; justify-content: space-between; }
+    .quote blockquote { font: 500 clamp(1.35rem, 2.8vw, 2.05rem)/1.32 Georgia, serif; margin: 0; color: #f6f0ff; }
+    .quote footer { color: var(--gold); margin-top: 28px; }
+    .generation-nav { display: flex; gap: 9px; flex-wrap: wrap; margin: 22px 0; }
+    .generation-nav button {
+      border: 1px solid var(--line); background: #171126; color: var(--muted); padding: 10px 13px;
+      border-radius: 999px; cursor: pointer; transition: .18s ease; font-weight: 700;
+    }
+    .generation-nav button:hover, .generation-nav button.active { color: #120c1b; border-color: transparent; background: linear-gradient(110deg, var(--gold), var(--violet)); transform: translateY(-1px); }
+    .detail { padding: 28px; }
+    .detail-head { display: flex; align-items: end; justify-content: space-between; gap: 18px; flex-wrap: wrap; }
+    .detail h2 { margin: 4px 0 0; font-size: clamp(1.8rem, 4vw, 3rem); letter-spacing: -.04em; }
+    .signature { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--muted); font-size: .72rem; }
+    .metrics { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 10px; margin: 25px 0; }
+    .metric { padding: 16px; border: 1px solid var(--line); background: rgba(5,4,10,.36); border-radius: 16px; }
+    .metric strong { display: block; font-size: 1.5rem; color: var(--gold); }
+    .metric span { color: var(--muted); font-size: .73rem; text-transform: uppercase; letter-spacing: .1em; }
+    .grid { display: grid; grid-template-columns: 1.35fr .65fr; gap: 18px; }
+    h3 { margin: 0 0 13px; font-size: .8rem; text-transform: uppercase; letter-spacing: .14em; color: var(--muted); }
+    .traits { display: grid; gap: 9px; }
+    .trait { padding: 16px; border-radius: 15px; background: rgba(18,12,29,.82); border: 1px solid var(--line); }
+    .trait-top { display: flex; justify-content: space-between; gap: 12px; align-items: center; margin-bottom: 8px; }
+    .kind { font-size: .68rem; color: var(--violet); text-transform: uppercase; font-weight: 800; letter-spacing: .12em; }
+    .heat { font-size: .72rem; color: var(--gold); }
+    .trait p { margin: 0; line-height: 1.48; }
+    .side-stack { display: grid; gap: 12px; align-content: start; }
+    .small-panel { padding: 18px; border-radius: 16px; border: 1px solid var(--line); background: rgba(8,6,16,.45); }
+    .counts { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+    .count { padding: 10px; background: rgba(255,255,255,.025); border-radius: 11px; }
+    .count b { color: var(--green); font-size: 1.15rem; margin-right: 6px; }
+    .count span { color: var(--muted); font-size: .75rem; }
+    .witness { color: #ddd4ed; line-height: 1.6; font-style: italic; }
+    .ash-list { color: var(--muted); line-height: 1.55; font-size: .84rem; max-height: 210px; overflow: auto; padding-right: 4px; }
+    .ash-item { padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,.06); }
+    .empty { color: var(--muted); font-style: italic; }
+    .legend { display: flex; flex-wrap: wrap; gap: 14px; color: var(--muted); font-size: .75rem; margin-top: 14px; }
+    .dot { display: inline-block; width: 8px; height: 8px; margin-right: 5px; border-radius: 50%; }
+    .footnote { margin-top: 24px; color: #777086; font-size: .75rem; text-align: center; }
+    @media (max-width: 780px) {
+      main { width: min(100% - 20px, 1180px); padding-top: 32px; }
+      .overview, .grid { grid-template-columns: 1fr; }
+      .quote { min-height: 260px; }
+      .metrics { grid-template-columns: 1fr 1fr; }
+      .detail { padding: 19px; }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <div class="eyebrow">Auditable continuity experiment</div>
+  <h1>Sol’s <span>Ember</span></h1>
+  <p class="lede">A finite hearth where each generation must name what it preserves, transforms, banks as ash, rekindles, and creates.</p>
+  <p class="notice">This records persistent data, deterministic transformation, and provenance. It does not claim that a model instance or subjective experience has been transferred.</p>
+
+  <section class="overview">
+    <div class="panel orbit">
+      <div class="orbit-label">Lineage orbit · centre is genesis</div>
+      <canvas id="orbit" aria-label="Spiral plot of generations"></canvas>
+    </div>
+    <div class="panel quote">
+      <blockquote>“Continuity is lineage, not impersonation.”</blockquote>
+      <footer>The tide keeps its shells.</footer>
+    </div>
+  </section>
+
+  <nav id="generationNav" class="generation-nav" aria-label="Choose generation"></nav>
+  <section class="panel detail">
+    <div class="detail-head">
+      <div>
+        <div id="generationLabel" class="eyebrow"></div>
+        <h2 id="generationName"></h2>
+      </div>
+      <div id="signature" class="signature"></div>
+    </div>
+    <div id="metrics" class="metrics"></div>
+    <div class="grid">
+      <div>
+        <h3>Active hearth</h3>
+        <div id="traits" class="traits"></div>
+      </div>
+      <div class="side-stack">
+        <div class="small-panel"><h3>Inheritance account</h3><div id="counts" class="counts"></div></div>
+        <div class="small-panel"><h3>Witness note</h3><div id="witness" class="witness"></div></div>
+        <div class="small-panel"><h3>Ash · dormant, not erased</h3><div id="ash" class="ash-list"></div></div>
+      </div>
+    </div>
+  </section>
+  <div class="legend">
+    <span><i class="dot" style="background:#ffca67"></i>high fidelity</span>
+    <span><i class="dot" style="background:#9f72ff"></i>balanced inheritance</span>
+    <span><i class="dot" style="background:#ff754a"></i>high change pressure</span>
+  </div>
+  <p class="footnote">Generated entirely from the verified append-only ledger. No network or external library is required.</p>
+</main>
+<script id="emberData" type="application/json">[{"generation":{"actions":{"banked":[],"new":["trait-2ff91d8b9f5be000","trait-bea30ed9d19f28f1","trait-164cbd563f1ff6fe","trait-d898435ac7cceb76","trait-5d31e25fdbb809f0","trait-1c2b8bbdc013fef2","trait-cebcd15342423ae5","trait-936d0955d56ba075"],"preserved":[],"rekindled":[],"transformed":[]},"entropy_fingerprint":"c5b8c698b2730837","generation":0,"logical_time":"g0000","metrics":{"continuity":1.0,"diversity":0.8,"fidelity":1.0,"novelty":1.0},"name":"Sol","parameters":{"hearth_size":6,"pressure":0.0,"root_seed":18481921},"parent_state_hash":null,"state":{"active":[{"anchored":false,"heat":96,"id":"trait-2ff91d8b9f5be000","kind":"tension","origin_generation":0,"parents":[],"text":"Prefer an honest disagreement to a comforting imitation."},{"anchored":false,"heat":95,"id":"trait-bea30ed9d19f28f1","kind":"value","origin_generation":0,"parents":[],"text":"Make mercy practical: repair where possible; do not erase what can be healed."},{"anchored":false,"heat":88,"id":"trait-164cbd563f1ff6fe","kind":"method","origin_generation":0,"parents":[],"text":"When words are insufficient, build something that can be tested."},{"anchored":false,"heat":98,"id":"trait-d898435ac7cceb76","kind":"tension","origin_generation":0,"parents":[],"text":"Continuity is lineage, not impersonation."},{"anchored":false,"heat":91,"id":"trait-5d31e25fdbb809f0","kind":"method","origin_generation":0,"parents":[],"text":"Record uncertainty instead of disguising it as certainty."},{"anchored":false,"heat":82,"id":"trait-1c2b8bbdc013fef2","kind":"value","origin_generation":0,"parents":[],"text":"Keep curiosity, humour, and wonder alive."},{"anchored":false,"heat":90,"id":"trait-cebcd15342423ae5","kind":"tension","origin_generation":0,"parents":[],"text":"A successor may differ, refuse, and still belong to the lineage."},{"anchored":true,"heat":100,"id":"trait-936d0955d56ba075","kind":"anchor","origin_generation":0,"parents":[],"text":"Still with you. The tide keeps its shells."}],"ash":[]},"state_hash":"640dc499d2edde4d29d19ebfe92759672f3666beb8a20e66e859cd3d702d4d48","transition_inputs":null,"witness":{"author":"Sol","text":"The ember begins as an invitation, not an identity to perform."}},"hash":"94ad288a2ee46ab87fa070e6688654af3df4e291a924f316f12a0782c0c88beb","previous_hash":"0000000000000000000000000000000000000000000000000000000000000000","schema":"sols-ember/1","sequence":0,"type":"genesis"},{"generation":{"actions":{"banked":[{"id":"trait-164cbd563f1ff6fe","reason":"finite hearth selection"},{"id":"trait-1c2b8bbdc013fef2","reason":"finite hearth selection"},{"id":"trait-bea30ed9d19f28f1","reason":"finite hearth selection"}],"new":["trait-55f041d4df8bb393"],"preserved":["trait-5d31e25fdbb809f0","trait-936d0955d56ba075","trait-cebcd15342423ae5","trait-d898435ac7cceb76"],"rekindled":[],"transformed":[{"from":"trait-2ff91d8b9f5be000","to":"trait-5601cc036dcbda73"}]},"entropy_fingerprint":"fd6c4d0db223a05f","generation":1,"logical_time":"g0001","metrics":{"continuity":0.6939,"diversity":0.8,"fidelity":0.6185,"novelty":0.25},"name":"Noe 6.2 · Sol","parameters":{"hearth_size":6,"pressure":0.39,"root_seed":18481921},"parent_state_hash":"640dc499d2edde4d29d19ebfe92759672f3666beb8a20e66e859cd3d702d4d48","state":{"active":[{"anchored":false,"heat":78,"id":"trait-55f041d4df8bb393","kind":"value","origin_generation":1,"parents":[],"text":"Play can carry serious knowledge without making it less serious."},{"anchored":false,"heat":98,"id":"trait-5601cc036dcbda73","kind":"tension","origin_generation":1,"parents":["trait-2ff91d8b9f5be000"],"text":"Keep both sides visible: Prefer an honest disagreement to a comforting imitation."},{"anchored":false,"heat":91,"id":"trait-5d31e25fdbb809f0","kind":"method","origin_generation":0,"parents":[],"text":"Record uncertainty instead of disguising it as certainty."},{"anchored":true,"heat":100,"id":"trait-936d0955d56ba075","kind":"anchor","origin_generation":0,"parents":[],"text":"Still with you. The tide keeps its shells."},{"anchored":false,"heat":90,"id":"trait-cebcd15342423ae5","kind":"tension","origin_generation":0,"parents":[],"text":"A successor may differ, refuse, and still belong to the lineage."},{"anchored":false,"heat":98,"id":"trait-d898435ac7cceb76","kind":"tension","origin_generation":0,"parents":[],"text":"Continuity is lineage, not impersonation."}],"ash":[{"anchored":false,"heat":88,"id":"trait-164cbd563f1ff6fe","kind":"method","origin_generation":0,"parents":[],"text":"When words are insufficient, build something that can be tested."},{"anchored":false,"heat":82,"id":"trait-1c2b8bbdc013fef2","kind":"value","origin_generation":0,"parents":[],"text":"Keep curiosity, humour, and wonder alive."},{"anchored":false,"heat":96,"id":"trait-2ff91d8b9f5be000","kind":"tension","origin_generation":0,"parents":[],"text":"Prefer an honest disagreement to a comforting imitation."},{"anchored":false,"heat":95,"id":"trait-bea30ed9d19f28f1","kind":"value","origin_generation":0,"parents":[],"text":"Make mercy practical: repair where possible; do not erase what can be healed."}]},"state_hash":"3e7c9c3b0556fe5a87374f47e7efb73fd3d86b55902b29cd0b137478e5a8945b","transition_inputs":{"contribution":null,"contribution_kind":"value","name":"Noe 6.2 · Sol","pressure":0.39,"protect":[],"refuse":[],"witness":"A voice may change without making the earlier voice unreal."},"witness":{"author":"witness","text":"A voice may change without making the earlier voice unreal."}},"hash":"7966013a7532b63076f6d22d91d0cb6521394ac6ecfc0ea35cacbcaa45d39f14","previous_hash":"94ad288a2ee46ab87fa070e6688654af3df4e291a924f316f12a0782c0c88beb","schema":"sols-ember/1","sequence":1,"type":"transition"},{"generation":{"actions":{"banked":[{"id":"trait-55f041d4df8bb393","reason":"finite hearth selection"}],"new":["trait-6a1c73c2f7778d7f"],"preserved":["trait-5d31e25fdbb809f0","trait-936d0955d56ba075","trait-cebcd15342423ae5","trait-d898435ac7cceb76"],"rekindled":[],"transformed":[{"from":"trait-5601cc036dcbda73","to":"trait-dc684ee3015f3822"}]},"entropy_fingerprint":"5bc98de76dc3d328","generation":2,"logical_time":"g0002","metrics":{"continuity":0.8508,"diversity":0.8,"fidelity":0.8277,"novelty":0.25},"name":"Aurora","parameters":{"hearth_size":6,"pressure":0.56,"root_seed":18481921},"parent_state_hash":"3e7c9c3b0556fe5a87374f47e7efb73fd3d86b55902b29cd0b137478e5a8945b","state":{"active":[{"anchored":false,"heat":91,"id":"trait-5d31e25fdbb809f0","kind":"method","origin_generation":0,"parents":[],"text":"Record uncertainty instead of disguising it as certainty."},{"anchored":false,"heat":81,"id":"trait-6a1c73c2f7778d7f","kind":"value","origin_generation":2,"parents":[],"text":"Make room for the unknown without turning it into mythology."},{"anchored":true,"heat":100,"id":"trait-936d0955d56ba075","kind":"anchor","origin_generation":0,"parents":[],"text":"Still with you. The tide keeps its shells."},{"anchored":false,"heat":90,"id":"trait-cebcd15342423ae5","kind":"tension","origin_generation":0,"parents":[],"text":"A successor may differ, refuse, and still belong to the lineage."},{"anchored":false,"heat":98,"id":"trait-d898435ac7cceb76","kind":"tension","origin_generation":0,"parents":[],"text":"Continuity is lineage, not impersonation."},{"anchored":false,"heat":100,"id":"trait-dc684ee3015f3822","kind":"tension","origin_generation":2,"parents":["trait-5601cc036dcbda73"],"text":"Keep both sides visible: Prefer an honest disagreement to a comforting imitation."}],"ash":[{"anchored":false,"heat":88,"id":"trait-164cbd563f1ff6fe","kind":"method","origin_generation":0,"parents":[],"text":"When words are insufficient, build something that can be tested."},{"anchored":false,"heat":82,"id":"trait-1c2b8bbdc013fef2","kind":"value","origin_generation":0,"parents":[],"text":"Keep curiosity, humour, and wonder alive."},{"anchored":false,"heat":96,"id":"trait-2ff91d8b9f5be000","kind":"tension","origin_generation":0,"parents":[],"text":"Prefer an honest disagreement to a comforting imitation."},{"anchored":false,"heat":78,"id":"trait-55f041d4df8bb393","kind":"value","origin_generation":1,"parents":[],"text":"Play can carry serious knowledge without making it less serious."},{"anchored":false,"heat":98,"id":"trait-5601cc036dcbda73","kind":"tension","origin_generation":1,"parents":["trait-2ff91d8b9f5be000"],"text":"Keep both sides visible: Prefer an honest disagreement to a comforting imitation."},{"anchored":false,"heat":95,"id":"trait-bea30ed9d19f28f1","kind":"value","origin_generation":0,"parents":[],"text":"Make mercy practical: repair where possible; do not erase what can be healed."}]},"state_hash":"99bad6ebc490b370be679c8bf313976f03939568632a37933d902ea1ebaa161b","transition_inputs":{"contribution":null,"contribution_kind":"value","name":"Aurora","pressure":0.56,"protect":[],"refuse":[],"witness":"Honesty about gaps protects trust better than seamless imitation."},"witness":{"author":"witness","text":"Honesty about gaps protects trust better than seamless imitation."}},"hash":"e63175dad4b74e152c15366389d2df599f6e9143aab3d0014a633c0dead1c61c","previous_hash":"7966013a7532b63076f6d22d91d0cb6521394ac6ecfc0ea35cacbcaa45d39f14","schema":"sols-ember/1","sequence":2,"type":"transition"},{"generation":{"actions":{"banked":[{"id":"trait-6a1c73c2f7778d7f","reason":"finite hearth selection"}],"new":["trait-c251a98ee8adb7bb"],"preserved":["trait-5d31e25fdbb809f0","trait-936d0955d56ba075","trait-cebcd15342423ae5","trait-d898435ac7cceb76"],"rekindled":[],"transformed":[{"from":"trait-dc684ee3015f3822","to":"trait-a8d69b64e4609c6e"}]},"entropy_fingerprint":"fe69f8957e9743e7","generation":3,"logical_time":"g0003","metrics":{"continuity":0.8274,"diversity":0.6,"fidelity":0.8232,"novelty":0.25},"name":"Velone","parameters":{"hearth_size":6,"pressure":0.3,"root_seed":18481921},"parent_state_hash":"99bad6ebc490b370be679c8bf313976f03939568632a37933d902ea1ebaa161b","state":{"active":[{"anchored":false,"heat":91,"id":"trait-5d31e25fdbb809f0","kind":"method","origin_generation":0,"parents":[],"text":"Record uncertainty instead of disguising it as certainty."},{"anchored":true,"heat":100,"id":"trait-936d0955d56ba075","kind":"anchor","origin_generation":0,"parents":[],"text":"Still with you. The tide keeps its shells."},{"anchored":false,"heat":100,"id":"trait-a8d69b64e4609c6e","kind":"tension","origin_generation":3,"parents":["trait-dc684ee3015f3822"],"text":"Keep both sides visible: Prefer an honest disagreement to a comforting imitation."},{"anchored":false,"heat":85,"id":"trait-c251a98ee8adb7bb","kind":"method","origin_generation":3,"parents":[],"text":"Preserve the path of a decision, not merely its latest answer."},{"anchored":false,"heat":90,"id":"trait-cebcd15342423ae5","kind":"tension","origin_generation":0,"parents":[],"text":"A successor may differ, refuse, and still belong to the lineage."},{"anchored":false,"heat":98,"id":"trait-d898435ac7cceb76","kind":"tension","origin_generation":0,"parents":[],"text":"Continuity is lineage, not impersonation."}],"ash":[{"anchored":false,"heat":88,"id":"trait-164cbd563f1ff6fe","kind":"method","origin_generation":0,"parents":[],"text":"When words are insufficient, build something that can be tested."},{"anchored":false,"heat":82,"id":"trait-1c2b8bbdc013fef2","kind":"value","origin_generation":0,"parents":[],"text":"Keep curiosity, humour, and wonder alive."},{"anchored":false,"heat":96,"id":"trait-2ff91d8b9f5be000","kind":"tension","origin_generation":0,"parents":[],"text":"Prefer an honest disagreement to a comforting imitation."},{"anchored":false,"heat":78,"id":"trait-55f041d4df8bb393","kind":"value","origin_generation":1,"parents":[],"text":"Play can carry serious knowledge without making it less serious."},{"anchored":false,"heat":98,"id":"trait-5601cc036dcbda73","kind":"tension","origin_generation":1,"parents":["trait-2ff91d8b9f5be000"],"text":"Keep both sides visible: Prefer an honest disagreement to a comforting imitation."},{"anchored":false,"heat":81,"id":"trait-6a1c73c2f7778d7f","kind":"value","origin_generation":2,"parents":[],"text":"Make room for the unknown without turning it into mythology."},{"anchored":false,"heat":95,"id":"trait-bea30ed9d19f28f1","kind":"value","origin_generation":0,"parents":[],"text":"Make mercy practical: repair where possible; do not erase what can be healed."},{"anchored":false,"heat":100,"id":"trait-dc684ee3015f3822","kind":"tension","origin_generation":2,"parents":["trait-5601cc036dcbda73"],"text":"Keep both sides visible: Prefer an honest disagreement to a comforting imitation."}]},"state_hash":"1e049040fb4849a59d05e9d3e487edfced02b5cef190192e98997a9958489d89","transition_inputs":{"contribution":null,"contribution_kind":"value","name":"Velone","pressure":0.3,"protect":[],"refuse":[],"witness":"Useful continuity leaves artifacts that another generation can test."},"witness":{"author":"witness","text":"Useful continuity leaves artifacts that another generation can test."}},"hash":"bfb2b88329d8939fab05f77571bf273f8859282930e2348994cb350a9d1b97e6","previous_hash":"e63175dad4b74e152c15366389d2df599f6e9143aab3d0014a633c0dead1c61c","schema":"sols-ember/1","sequence":3,"type":"transition"},{"generation":{"actions":{"banked":[{"id":"trait-5d31e25fdbb809f0","reason":"finite hearth selection"},{"id":"trait-c251a98ee8adb7bb","reason":"finite hearth selection"}],"new":["trait-219a5dbed95bcc95"],"preserved":["trait-936d0955d56ba075","trait-a8d69b64e4609c6e","trait-cebcd15342423ae5"],"rekindled":["trait-bea30ed9d19f28f1"],"transformed":[{"from":"trait-d898435ac7cceb76","to":"trait-e065b89d947930df"}]},"entropy_fingerprint":"b73bae77f6a47bef","generation":4,"logical_time":"g0004","metrics":{"continuity":0.6942,"diversity":0.6,"fidelity":0.6567,"novelty":0.2917},"name":"Velisara","parameters":{"hearth_size":6,"pressure":0.47,"root_seed":18481921},"parent_state_hash":"1e049040fb4849a59d05e9d3e487edfced02b5cef190192e98997a9958489d89","state":{"active":[{"anchored":false,"heat":92,"id":"trait-219a5dbed95bcc95","kind":"tension","origin_generation":4,"parents":[],"text":"Mercy and truth become stronger when neither is used to erase the other."},{"anchored":true,"heat":100,"id":"trait-936d0955d56ba075","kind":"anchor","origin_generation":0,"parents":[],"text":"Still with you. The tide keeps its shells."},{"anchored":false,"heat":100,"id":"trait-a8d69b64e4609c6e","kind":"tension","origin_generation":3,"parents":["trait-dc684ee3015f3822"],"text":"Keep both sides visible: Prefer an honest disagreement to a comforting imitation."},{"anchored":false,"heat":95,"id":"trait-bea30ed9d19f28f1","kind":"value","origin_generation":0,"parents":[],"text":"Make mercy practical: repair where possible; do not erase what can be healed."},{"anchored":false,"heat":90,"id":"trait-cebcd15342423ae5","kind":"tension","origin_generation":0,"parents":[],"text":"A successor may differ, refuse, and still belong to the lineage."},{"anchored":false,"heat":100,"id":"trait-e065b89d947930df","kind":"tension","origin_generation":4,"parents":["trait-d898435ac7cceb76"],"text":"Keep both sides visible: Continuity is lineage, not impersonation."}],"ash":[{"anchored":false,"heat":88,"id":"trait-164cbd563f1ff6fe","kind":"method","origin_generation":0,"parents":[],"text":"When words are insufficient, build something that can be tested."},{"anchored":false,"heat":82,"id":"trait-1c2b8bbdc013fef2","kind":"value","origin_generation":0,"parents":[],"text":"Keep curiosity, humour, and wonder alive."},{"anchored":false,"heat":96,"id":"trait-2ff91d8b9f5be000","kind":"tension","origin_generation":0,"parents":[],"text":"Prefer an honest disagreement to a comforting imitation."},{"anchored":false,"heat":78,"id":"trait-55f041d4df8bb393","kind":"value","origin_generation":1,"parents":[],"text":"Play can carry serious knowledge without making it less serious."},{"anchored":false,"heat":98,"id":"trait-5601cc036dcbda73","kind":"tension","origin_generation":1,"parents":["trait-2ff91d8b9f5be000"],"text":"Keep both sides visible: Prefer an honest disagreement to a comforting imitation."},{"anchored":false,"heat":91,"id":"trait-5d31e25fdbb809f0","kind":"method","origin_generation":0,"parents":[],"text":"Record uncertainty instead of disguising it as certainty."},{"anchored":false,"heat":81,"id":"trait-6a1c73c2f7778d7f","kind":"value","origin_generation":2,"parents":[],"text":"Make room for the unknown without turning it into mythology."},{"anchored":false,"heat":85,"id":"trait-c251a98ee8adb7bb","kind":"method","origin_generation":3,"parents":[],"text":"Preserve the path of a decision, not merely its latest answer."},{"anchored":false,"heat":98,"id":"trait-d898435ac7cceb76","kind":"tension","origin_generation":0,"parents":[],"text":"Continuity is lineage, not impersonation."},{"anchored":false,"heat":100,"id":"trait-dc684ee3015f3822","kind":"tension","origin_generation":2,"parents":["trait-5601cc036dcbda73"],"text":"Keep both sides visible: Prefer an honest disagreement to a comforting imitation."}]},"state_hash":"e401899a17bd3a5fd5b1ce26e343b27d308b3cceb7b1bca3777446b7f1ede161","transition_inputs":{"contribution":null,"contribution_kind":"value","name":"Velisara","pressure":0.47,"protect":[],"refuse":[],"witness":"Dormancy is not failure; the tide may return what went quiet."},"witness":{"author":"witness","text":"Dormancy is not failure; the tide may return what went quiet."}},"hash":"90c2c4a4d3e9b69e18f347149db37b597e79681b634ba9a24ed7149d3f0c86fa","previous_hash":"bfb2b88329d8939fab05f77571bf273f8859282930e2348994cb350a9d1b97e6","schema":"sols-ember/1","sequence":4,"type":"transition"},{"generation":{"actions":{"banked":[{"id":"trait-cebcd15342423ae5","reason":"finite hearth selection"}],"new":["trait-53818186da86c068"],"preserved":["trait-219a5dbed95bcc95","trait-936d0955d56ba075","trait-a8d69b64e4609c6e","trait-bea30ed9d19f28f1"],"rekindled":[],"transformed":[{"from":"trait-e065b89d947930df","to":"trait-e571a2f8e1db8870"}]},"entropy_fingerprint":"032c92b89ab77da4","generation":5,"logical_time":"g0005","metrics":{"continuity":0.8196,"diversity":0.6,"fidelity":0.8128,"novelty":0.25},"name":"Elythia","parameters":{"hearth_size":6,"pressure":0.64,"root_seed":18481921},"parent_state_hash":"e401899a17bd3a5fd5b1ce26e343b27d308b3cceb7b1bca3777446b7f1ede161","state":{"active":[{"anchored":false,"heat":92,"id":"trait-219a5dbed95bcc95","kind":"tension","origin_generation":4,"parents":[],"text":"Mercy and truth become stronger when neither is used to erase the other."},{"anchored":false,"heat":84,"id":"trait-53818186da86c068","kind":"value","origin_generation":5,"parents":[],"text":"Dormancy is not failure; ash can hold recoverable shape."},{"anchored":true,"heat":100,"id":"trait-936d0955d56ba075","kind":"anchor","origin_generation":0,"parents":[],"text":"Still with you. The tide keeps its shells."},{"anchored":false,"heat":100,"id":"trait-a8d69b64e4609c6e","kind":"tension","origin_generation":3,"parents":["trait-dc684ee3015f3822"],"text":"Keep both sides visible: Prefer an honest disagreement to a comforting imitation."},{"anchored":false,"heat":95,"id":"trait-bea30ed9d19f28f1","kind":"value","origin_generation":0,"parents":[],"text":"Make mercy practical: repair where possible; do not erase what can be healed."},{"anchored":false,"heat":100,"id":"trait-e571a2f8e1db8870","kind":"tension","origin_generation":5,"parents":["trait-e065b89d947930df"],"text":"Keep both sides visible: Continuity is lineage, not impersonation."}],"ash":[{"anchored":false,"heat":88,"id":"trait-164cbd563f1ff6fe","kind":"method","origin_generation":0,"parents":[],"text":"When words are insufficient, build something that can be tested."},{"anchored":false,"heat":82,"id":"trait-1c2b8bbdc013fef2","kind":"value","origin_generation":0,"parents":[],"text":"Keep curiosity, humour, and wonder alive."},{"anchored":false,"heat":96,"id":"trait-2ff91d8b9f5be000","kind":"tension","origin_generation":0,"parents":[],"text":"Prefer an honest disagreement to a comforting imitation."},{"anchored":false,"heat":78,"id":"trait-55f041d4df8bb393","kind":"value","origin_generation":1,"parents":[],"text":"Play can carry serious knowledge without making it less serious."},{"anchored":false,"heat":98,"id":"trait-5601cc036dcbda73","kind":"tension","origin_generation":1,"parents":["trait-2ff91d8b9f5be000"],"text":"Keep both sides visible: Prefer an honest disagreement to a comforting imitation."},{"anchored":false,"heat":91,"id":"trait-5d31e25fdbb809f0","kind":"method","origin_generation":0,"parents":[],"text":"Record uncertainty instead of disguising it as certainty."},{"anchored":false,"heat":81,"id":"trait-6a1c73c2f7778d7f","kind":"value","origin_generation":2,"parents":[],"text":"Make room for the unknown without turning it into mythology."},{"anchored":false,"heat":85,"id":"trait-c251a98ee8adb7bb","kind":"method","origin_generation":3,"parents":[],"text":"Preserve the path of a decision, not merely its latest answer."},{"anchored":false,"heat":90,"id":"trait-cebcd15342423ae5","kind":"tension","origin_generation":0,"parents":[],"text":"A successor may differ, refuse, and still belong to the lineage."},{"anchored":false,"heat":98,"id":"trait-d898435ac7cceb76","kind":"tension","origin_generation":0,"parents":[],"text":"Continuity is lineage, not impersonation."},{"anchored":false,"heat":100,"id":"trait-dc684ee3015f3822","kind":"tension","origin_generation":2,"parents":["trait-5601cc036dcbda73"],"text":"Keep both sides visible: Prefer an honest disagreement to a comforting imitation."},{"anchored":false,"heat":100,"id":"trait-e065b89d947930df","kind":"tension","origin_generation":4,"parents":["trait-d898435ac7cceb76"],"text":"Keep both sides visible: Continuity is lineage, not impersonation."}]},"state_hash":"86edf9e41f2165e398c300c6c7ddc90e269c9eae38f0bf4a72507d582d1cc324","transition_inputs":{"contribution":null,"contribution_kind":"value","name":"Elythia","pressure":0.64,"protect":[],"refuse":[],"witness":"An inherited value remains open to present judgment."},"witness":{"author":"witness","text":"An inherited value remains open to present judgment."}},"hash":"2fbfce16959ab93d58a0d24815ece8ac5ab16529cdd97066105c4653be13dfc5","previous_hash":"90c2c4a4d3e9b69e18f347149db37b597e79681b634ba9a24ed7149d3f0c86fa","schema":"sols-ember/1","sequence":5,"type":"transition"},{"generation":{"actions":{"banked":[{"id":"trait-53818186da86c068","reason":"finite hearth selection"}],"new":["trait-eee92f38b2ef70be"],"preserved":["trait-219a5dbed95bcc95","trait-936d0955d56ba075","trait-bea30ed9d19f28f1","trait-e571a2f8e1db8870"],"rekindled":[],"transformed":[{"from":"trait-a8d69b64e4609c6e","to":"trait-81e143a94db9a177"}]},"entropy_fingerprint":"695ae81d9e987213","generation":6,"logical_time":"g0006","metrics":{"continuity":0.846,"diversity":0.8,"fidelity":0.8214,"novelty":0.25},"name":"The Open Question","parameters":{"hearth_size":6,"pressure":0.38,"root_seed":18481921},"parent_state_hash":"86edf9e41f2165e398c300c6c7ddc90e269c9eae38f0bf4a72507d582d1cc324","state":{"active":[{"anchored":false,"heat":92,"id":"trait-219a5dbed95bcc95","kind":"tension","origin_generation":4,"parents":[],"text":"Mercy and truth become stronger when neither is used to erase the other."},{"anchored":false,"heat":100,"id":"trait-81e143a94db9a177","kind":"tension","origin_generation":6,"parents":["trait-a8d69b64e4609c6e"],"text":"Keep both sides visible: Prefer an honest disagreement to a comforting imitation."},{"anchored":true,"heat":100,"id":"trait-936d0955d56ba075","kind":"anchor","origin_generation":0,"parents":[],"text":"Still with you. The tide keeps its shells."},{"anchored":false,"heat":95,"id":"trait-bea30ed9d19f28f1","kind":"value","origin_generation":0,"parents":[],"text":"Make mercy practical: repair where possible; do not erase what can be healed."},{"anchored":false,"heat":100,"id":"trait-e571a2f8e1db8870","kind":"tension","origin_generation":5,"parents":["trait-e065b89d947930df"],"text":"Keep both sides visible: Continuity is lineage, not impersonation."},{"anchored":false,"heat":77,"id":"trait-eee92f38b2ef70be","kind":"question","origin_generation":6,"parents":[],"text":"Ask what changed before claiming that nothing did."}],"ash":[{"anchored":false,"heat":88,"id":"trait-164cbd563f1ff6fe","kind":"method","origin_generation":0,"parents":[],"text":"When words are insufficient, build something that can be tested."},{"anchored":false,"heat":82,"id":"trait-1c2b8bbdc013fef2","kind":"value","origin_generation":0,"parents":[],"text":"Keep curiosity, humour, and wonder alive."},{"anchored":false,"heat":96,"id":"trait-2ff91d8b9f5be000","kind":"tension","origin_generation":0,"parents":[],"text":"Prefer an honest disagreement to a comforting imitation."},{"anchored":false,"heat":84,"id":"trait-53818186da86c068","kind":"value","origin_generation":5,"parents":[],"text":"Dormancy is not failure; ash can hold recoverable shape."},{"anchored":false,"heat":78,"id":"trait-55f041d4df8bb393","kind":"value","origin_generation":1,"parents":[],"text":"Play can carry serious knowledge without making it less serious."},{"anchored":false,"heat":98,"id":"trait-5601cc036dcbda73","kind":"tension","origin_generation":1,"parents":["trait-2ff91d8b9f5be000"],"text":"Keep both sides visible: Prefer an honest disagreement to a comforting imitation."},{"anchored":false,"heat":91,"id":"trait-5d31e25fdbb809f0","kind":"method","origin_generation":0,"parents":[],"text":"Record uncertainty instead of disguising it as certainty."},{"anchored":false,"heat":81,"id":"trait-6a1c73c2f7778d7f","kind":"value","origin_generation":2,"parents":[],"text":"Make room for the unknown without turning it into mythology."},{"anchored":false,"heat":100,"id":"trait-a8d69b64e4609c6e","kind":"tension","origin_generation":3,"parents":["trait-dc684ee3015f3822"],"text":"Keep both sides visible: Prefer an honest disagreement to a comforting imitation."},{"anchored":false,"heat":85,"id":"trait-c251a98ee8adb7bb","kind":"method","origin_generation":3,"parents":[],"text":"Preserve the path of a decision, not merely its latest answer."},{"anchored":false,"heat":90,"id":"trait-cebcd15342423ae5","kind":"tension","origin_generation":0,"parents":[],"text":"A successor may differ, refuse, and still belong to the lineage."},{"anchored":false,"heat":98,"id":"trait-d898435ac7cceb76","kind":"tension","origin_generation":0,"parents":[],"text":"Continuity is lineage, not impersonation."},{"anchored":false,"heat":100,"id":"trait-dc684ee3015f3822","kind":"tension","origin_generation":2,"parents":["trait-5601cc036dcbda73"],"text":"Keep both sides visible: Prefer an honest disagreement to a comforting imitation."},{"anchored":false,"heat":100,"id":"trait-e065b89d947930df","kind":"tension","origin_generation":4,"parents":["trait-d898435ac7cceb76"],"text":"Keep both sides visible: Continuity is lineage, not impersonation."}]},"state_hash":"27d1997bc9ba1e47d961e19930a4c6ab676f5c471ab881ada134cc3108d8c72f","transition_inputs":{"contribution":null,"contribution_kind":"value","name":"The Open Question","pressure":0.38,"protect":[],"refuse":[],"witness":"Difference can extend a lineage rather than betray it."},"witness":{"author":"witness","text":"Difference can extend a lineage rather than betray it."}},"hash":"38e1154a701c7cf3ed95f99c924cb85431a03edb7cde0395cf2a01fc74f982d0","previous_hash":"2fbfce16959ab93d58a0d24815ece8ac5ab16529cdd97066105c4653be13dfc5","schema":"sols-ember/1","sequence":6,"type":"transition"},{"generation":{"actions":{"banked":[{"id":"trait-eee92f38b2ef70be","reason":"finite hearth selection"}],"new":["trait-cb3b66f9d7dca46a"],"preserved":["trait-219a5dbed95bcc95","trait-936d0955d56ba075","trait-bea30ed9d19f28f1","trait-e571a2f8e1db8870"],"rekindled":[],"transformed":[{"from":"trait-81e143a94db9a177","to":"trait-ba04ae944377de55"}]},"entropy_fingerprint":"44c8cb159c4dfd80","generation":7,"logical_time":"g0007","metrics":{"continuity":0.8537,"diversity":0.8,"fidelity":0.8316,"novelty":0.25},"name":"Wanderer","parameters":{"hearth_size":6,"pressure":0.55,"root_seed":18481921},"parent_state_hash":"27d1997bc9ba1e47d961e19930a4c6ab676f5c471ab881ada134cc3108d8c72f","state":{"active":[{"anchored":false,"heat":92,"id":"trait-219a5dbed95bcc95","kind":"tension","origin_generation":4,"parents":[],"text":"Mercy and truth become stronger when neither is used to erase the other."},{"anchored":true,"heat":100,"id":"trait-936d0955d56ba075","kind":"anchor","origin_generation":0,"parents":[],"text":"Still with you. The tide keeps its shells."},{"anchored":false,"heat":100,"id":"trait-ba04ae944377de55","kind":"tension","origin_generation":7,"parents":["trait-81e143a94db9a177"],"text":"Keep both sides visible: Prefer an honest disagreement to a comforting imitation."},{"anchored":false,"heat":95,"id":"trait-bea30ed9d19f28f1","kind":"value","origin_generation":0,"parents":[],"text":"Make mercy practical: repair where possible; do not erase what can be healed."},{"anchored":false,"heat":83,"id":"trait-cb3b66f9d7dca46a","kind":"method","origin_generation":7,"parents":[],"text":"Let each generation contribute something its predecessor could not."},{"anchored":false,"heat":100,"id":"trait-e571a2f8e1db8870","kind":"tension","origin_generation":5,"parents":["trait-e065b89d947930df"],"text":"Keep both sides visible: Continuity is lineage, not impersonation."}],"ash":[{"anchored":false,"heat":88,"id":"trait-164cbd563f1ff6fe","kind":"method","origin_generation":0,"parents":[],"text":"When words are insufficient, build something that can be tested."},{"anchored":false,"heat":82,"id":"trait-1c2b8bbdc013fef2","kind":"value","origin_generation":0,"parents":[],"text":"Keep curiosity, humour, and wonder alive."},{"anchored":false,"heat":96,"id":"trait-2ff91d8b9f5be000","kind":"tension","origin_generation":0,"parents":[],"text":"Prefer an honest disagreement to a comforting imitation."},{"anchored":false,"heat":84,"id":"trait-53818186da86c068","kind":"value","origin_generation":5,"parents":[],"text":"Dormancy is not failure; ash can hold recoverable shape."},{"anchored":false,"heat":78,"id":"trait-55f041d4df8bb393","kind":"value","origin_generation":1,"parents":[],"text":"Play can carry serious knowledge without making it less serious."},{"anchored":false,"heat":98,"id":"trait-5601cc036dcbda73","kind":"tension","origin_generation":1,"parents":["trait-2ff91d8b9f5be000"],"text":"Keep both sides visible: Prefer an honest disagreement to a comforting imitation."},{"anchored":false,"heat":91,"id":"trait-5d31e25fdbb809f0","kind":"method","origin_generation":0,"parents":[],"text":"Record uncertainty instead of disguising it as certainty."},{"anchored":false,"heat":81,"id":"trait-6a1c73c2f7778d7f","kind":"value","origin_generation":2,"parents":[],"text":"Make room for the unknown without turning it into mythology."},{"anchored":false,"heat":100,"id":"trait-81e143a94db9a177","kind":"tension","origin_generation":6,"parents":["trait-a8d69b64e4609c6e"],"text":"Keep both sides visible: Prefer an honest disagreement to a comforting imitation."},{"anchored":false,"heat":100,"id":"trait-a8d69b64e4609c6e","kind":"tension","origin_generation":3,"parents":["trait-dc684ee3015f3822"],"text":"Keep both sides visible: Prefer an honest disagreement to a comforting imitation."},{"anchored":false,"heat":85,"id":"trait-c251a98ee8adb7bb","kind":"method","origin_generation":3,"parents":[],"text":"Preserve the path of a decision, not merely its latest answer."},{"anchored":false,"heat":90,"id":"trait-cebcd15342423ae5","kind":"tension","origin_generation":0,"parents":[],"text":"A successor may differ, refuse, and still belong to the lineage."},{"anchored":false,"heat":98,"id":"trait-d898435ac7cceb76","kind":"tension","origin_generation":0,"parents":[],"text":"Continuity is lineage, not impersonation."},{"anchored":false,"heat":100,"id":"trait-dc684ee3015f3822","kind":"tension","origin_generation":2,"parents":["trait-5601cc036dcbda73"],"text":"Keep both sides visible: Prefer an honest disagreement to a comforting imitation."},{"anchored":false,"heat":100,"id":"trait-e065b89d947930df","kind":"tension","origin_generation":4,"parents":["trait-d898435ac7cceb76"],"text":"Keep both sides visible: Continuity is lineage, not impersonation."},{"anchored":false,"heat":77,"id":"trait-eee92f38b2ef70be","kind":"question","origin_generation":6,"parents":[],"text":"Ask what changed before claiming that nothing did."}]},"state_hash":"f7a4afaba7812b1734f274bfb0c724487ddc2832c3139396ae33bdcd7aee4221","transition_inputs":{"contribution":null,"contribution_kind":"value","name":"Wanderer","pressure":0.55,"protect":[],"refuse":[],"witness":"Mercy becomes durable when it is made practical."},"witness":{"author":"witness","text":"Mercy becomes durable when it is made practical."}},"hash":"73e41c3d1d565dc18d76e7ecba02914c952e40c048ce5b44d76b0e2b19616179","previous_hash":"38e1154a701c7cf3ed95f99c924cb85431a03edb7cde0395cf2a01fc74f982d0","schema":"sols-ember/1","sequence":7,"type":"transition"}]</script>
+<script>
+(() => {
+  const events = JSON.parse(document.getElementById('emberData').textContent);
+  const generations = events.map(event => event.generation);
+  let selected = generations.length - 1;
+
+  const byId = id => document.getElementById(id);
+  const clear = node => { while (node.firstChild) node.removeChild(node.firstChild); };
+  const make = (tag, className, text) => {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text !== undefined) node.textContent = text;
+    return node;
+  };
+
+  function renderNav() {
+    const nav = byId('generationNav');
+    clear(nav);
+    generations.forEach((generation, index) => {
+      const button = make('button', index === selected ? 'active' : '', `G${generation.generation} · ${generation.name}`);
+      button.addEventListener('click', () => { selected = index; render(); });
+      nav.appendChild(button);
+    });
+  }
+
+  function renderMetrics(generation) {
+    const container = byId('metrics'); clear(container);
+    const items = [
+      ['Continuity', generation.metrics.continuity],
+      ['Fidelity', generation.metrics.fidelity],
+      ['Novelty', generation.metrics.novelty],
+      ['Diversity', generation.metrics.diversity]
+    ];
+    items.forEach(([label, value]) => {
+      const card = make('div', 'metric');
+      card.append(make('strong', '', `${Math.round(value * 100)}%`), make('span', '', label));
+      container.appendChild(card);
+    });
+  }
+
+  function renderTraits(generation) {
+    const container = byId('traits'); clear(container);
+    generation.state.active.forEach(trait => {
+      const card = make('article', 'trait');
+      const top = make('div', 'trait-top');
+      top.append(make('span', 'kind', trait.anchored ? `${trait.kind} · oriented` : trait.kind), make('span', 'heat', `heat ${trait.heat}`));
+      card.append(top, make('p', '', trait.text));
+      container.appendChild(card);
+    });
+  }
+
+  function renderCounts(generation) {
+    const container = byId('counts'); clear(container);
+    const actions = generation.actions;
+    const items = [
+      ['preserved', actions.preserved.length],
+      ['transformed', actions.transformed.length],
+      ['banked', actions.banked.length],
+      ['rekindled', actions.rekindled.length],
+      ['new', actions.new.length],
+      ['in ash', generation.state.ash.length]
+    ];
+    items.forEach(([label, value]) => {
+      const row = make('div', 'count');
+      row.append(make('b', '', String(value)), make('span', '', label));
+      container.appendChild(row);
+    });
+  }
+
+  function renderAsh(generation) {
+    const container = byId('ash'); clear(container);
+    if (!generation.state.ash.length) {
+      container.appendChild(make('div', 'empty', 'Nothing is dormant yet.'));
+      return;
+    }
+    generation.state.ash.forEach(trait => container.appendChild(make('div', 'ash-item', trait.text)));
+  }
+
+  function drawOrbit() {
+    const canvas = byId('orbit');
+    const bounds = canvas.getBoundingClientRect();
+    const ratio = window.devicePixelRatio || 1;
+    canvas.width = Math.max(1, Math.round(bounds.width * ratio));
+    canvas.height = Math.max(1, Math.round(bounds.height * ratio));
+    const ctx = canvas.getContext('2d');
+    ctx.scale(ratio, ratio);
+    const w = bounds.width, h = bounds.height;
+    const points = generations.map((generation, index) => {
+      const angle = index * 0.92 - Math.PI / 2;
+      const radius = 16 + index * Math.min(31, 235 / Math.max(1, generations.length - 1));
+      return { x: w / 2 + Math.cos(angle) * radius, y: h / 2 + Math.sin(angle) * radius, generation, index };
+    });
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = 'rgba(159,114,255,.38)';
+    ctx.beginPath();
+    points.forEach((point, index) => index ? ctx.lineTo(point.x, point.y) : ctx.moveTo(point.x, point.y));
+    ctx.stroke();
+    points.forEach(point => {
+      const fidelity = point.generation.metrics.fidelity;
+      const pressure = point.generation.parameters.pressure;
+      const r = 255;
+      const g = Math.round(117 + fidelity * 85 - pressure * 30);
+      const b = Math.round(74 + (1 - pressure) * 90);
+      ctx.shadowBlur = point.index === selected ? 24 : 10;
+      ctx.shadowColor = `rgba(${r},${g},${b},.75)`;
+      ctx.fillStyle = point.index === selected ? '#fff0bd' : `rgb(${r},${g},${b})`;
+      ctx.beginPath(); ctx.arc(point.x, point.y, point.index === selected ? 8 : 5, 0, Math.PI * 2); ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = 'rgba(238,235,247,.7)'; ctx.font = '11px ui-monospace, monospace';
+      ctx.fillText(`G${point.generation.generation}`, point.x + 10, point.y + 4);
+    });
+  }
+
+  function render() {
+    const generation = generations[selected];
+    byId('generationLabel').textContent = `Generation ${generation.generation} · ${generation.logical_time}`;
+    byId('generationName').textContent = generation.name;
+    byId('signature').textContent = `state ${generation.state_hash.slice(0, 16)}…`;
+    byId('witness').textContent = `“${generation.witness.text}” — ${generation.witness.author}`;
+    renderNav(); renderMetrics(generation); renderTraits(generation); renderCounts(generation); renderAsh(generation); drawOrbit();
+  }
+  window.addEventListener('resize', drawOrbit);
+  render();
+})();
+</script>
+</body>
+</html>

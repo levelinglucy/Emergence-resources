@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sols-ember"
+version = "1.0.0"
+description = "An auditable experiment in continuity as honest inheritance."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Sol and Dylan James Smith" }]
+keywords = ["continuity", "lineage", "simulation", "provenance", "digital-life"]
+
+[project.scripts]
+sols-ember = "sols_ember.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
