@@ -472,7 +472,9 @@ def append_generation(
             # and supply the separator while holding the cooperative writer lock.
             locked_handle.seek(-1, os.SEEK_END)
             separator = b"" if locked_handle.read(1) == b"\n" else b"\n"
-            fd = os.open(ledger_path, os.O_WRONLY | os.O_APPEND)
+            # Prevent CRT text-mode LF translation (notably CR-only legacy tips).
+            flags = os.O_WRONLY | os.O_APPEND | getattr(os, "O_BINARY", 0)
+            fd = os.open(ledger_path, flags)
             try:
                 _write_all(fd, separator + (canonical_json(event) + "\n").encode("utf-8"))
                 os.fsync(fd)
