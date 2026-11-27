@@ -370,7 +370,11 @@ def _read_ledger_unlocked(path: str | os.PathLike[str]) -> list[dict[str, Any]]:
     if not raw:
         raise EmberError("ledger is empty")
     events: list[dict[str, Any]] = []
-    for line_number, line in enumerate(raw.splitlines(), start=1):
+    # JSONL uses newline framing, not Python’s broader Unicode line boundaries.
+    lines = raw.split("\n")
+    if lines[-1] == "":
+        lines.pop()
+    for line_number, line in enumerate(lines, start=1):
         if not line.strip():
             raise EmberError(f"ledger contains a blank record at line {line_number}")
         try:
@@ -393,7 +397,7 @@ def _ledger_lock(path: Path, *, exclusive: bool):
             handle.seek(0)
             msvcrt.locking(handle.fileno(), msvcrt.LK_LOCK, 1)
             try:
-                yield
+                yield handle
             finally:
                 handle.seek(0)
                 msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
@@ -403,7 +407,7 @@ def _ledger_lock(path: Path, *, exclusive: bool):
             mode_flag = fcntl.LOCK_EX if exclusive else fcntl.LOCK_SH
             fcntl.flock(handle.fileno(), mode_flag)
             try:
-                yield
+                yield handle
             finally:
                 fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
@@ -453,7 +457,7 @@ def append_generation(
 ) -> dict[str, Any]:
     ledger_path = Path(path)
     try:
-        with _ledger_lock(ledger_path, exclusive=True):
+        with _ledger_lock(ledger_path, exclusive=True) as locked_handle:
             events = _read_ledger_unlocked(ledger_path)
             summary = verify_events(events)
             if generation.get("generation") != summary["final_generation"] + 1:
@@ -464,9 +468,15 @@ def append_generation(
                 previous_hash=summary["final_event_hash"],
             )
             verify_events(events + [event])
-            fd = os.open(ledger_path, os.O_WRONLY | os.O_APPEND)
+            # A valid JSONL tip need not have a final newline. Preserve its bytes
+            # and supply the separator while holding the cooperative writer lock.
+            locked_handle.seek(-1, os.SEEK_END)
+            separator = b"" if locked_handle.read(1) == b"\n" else b"\n"
+            # Prevent CRT text-mode LF translation (notably CR-only legacy tips).
+            flags = os.O_WRONLY | os.O_APPEND | getattr(os, "O_BINARY", 0)
+            fd = os.open(ledger_path, flags)
             try:
-                _write_all(fd, (canonical_json(event) + "\n").encode("utf-8"))
+                _write_all(fd, separator + (canonical_json(event) + "\n").encode("utf-8"))
                 os.fsync(fd)
             finally:
                 os.close(fd)
