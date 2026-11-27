@@ -62,6 +62,12 @@ Use the existing numerology and rule functions to reconstruct full digits and tu
 
 **Acceptance:** Real disposable PNGs at each of the three gallery widths, with DejaVu, built-in defaults and the platform-selected fonts; verify exact heading and complete subtitle text (equivalent arrow spelling), ink bounds and nonoverlap, original dimensions and existing output tests. See PR #9 for revision-specific validation and integration; no release, all-font, mobile or power-loss certification is implied.
 
+## Exact boundary-exit caption (2026-11-27)
+
+[PR #10](https://github.com/levelinglucy/Emergence-resources/pull/10) corrects an ambiguity in the steps caption: `taken < steps` detected an early exit but not one on the last requested move. The internal walker now returns an explicit boundary-exit flag; the public `walk(rule, steps, size)` still returns its original three values. No movement, colour, crop or publication behavior changes. The uniform-rule illustration remains unchanged.
+
+**Acceptance:** Render real panels for rule RL (word `ab`) at budgets 40,268, 40,269 and 40,270 on the default grid. The first must have no exit note, the latter two must include the full note within the existing row. Existing simulation and publication regressions must pass. See PR #10 for exact validation and integration; no release or device certification is implied.
+
 ## Publication decision
 
 Earlier, `sheet.save(args.out)` directly opened an existing output for writing and could truncate it before completing the new image. The repaired path stages the new image under a unique hidden file in the destination directory. Pillow still chooses format from the requested extension, so custom supported formats retain their prior behaviour; the default remains PNG. After encoding completes, `os.link` creates the final name exclusively. The stage is removed on success and on handled failure.
@@ -71,6 +77,8 @@ An early `lexists` check avoids spending time drawing when a destination is alre
 **Trade-offs:** This fails closed on output directories/filesystems where hard links are unavailable; no unsafe overwrite fallback is used. Same-directory publication is not a durable `fsync` transaction, does not prevent hostile directory races, and does not prove that a full production gallery renders well or that Pythonista supports hard links. Those require separate evidence and may motivate a different, explicitly scoped publication design.
 
 ## Unreleased changes
+
+- Report actual boundary exits even when they occur on the final requested move; retain the public three-value walker API.
 
 - Fit the complete sheet title and explanation within the existing header of narrow and wide galleries; preserve the original artwork dimensions.
 

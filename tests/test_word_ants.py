@@ -116,7 +116,7 @@ class WordAntPublicationTests(unittest.TestCase):
 
 
 class WordAntCaptionTests(unittest.TestCase):
-    def capture_captions(self, word, fonts):
+    def capture_captions(self, word, fonts, steps=1032):
         # Observe real drawing calls, measuring using the very same fonts,
         # positions and anchors. The original renderer still produces pixels.
         original = ants.ImageDraw.ImageDraw.text
@@ -128,8 +128,25 @@ class WordAntCaptionTests(unittest.TestCase):
                 labels.append((text, bounds))
             return original(draw, xy, text, *args, **kwargs)
         with patch.object(ants.ImageDraw.ImageDraw, "text", observe):
-            panel = ants.render_panel(word, 1032, 380, fonts)
+            panel = ants.render_panel(word, steps, 380, fonts)
         return panel, labels
+
+    def test_boundary_exit_caption_includes_final_requested_step(self):
+        fonts = (ants.ImageFont.truetype("DejaVuSans.ttf", 30),
+                 ants.ImageFont.truetype("DejaVuSans.ttf", 18),
+                 ants.ImageFont.truetype("DejaVuSansMono.ttf", 17))
+        # RL leaves the default 1200-square grid on move 40,269.
+        for budget, expected in (
+            (40268, "40,268 steps"),
+            (40269, "40,269 steps  (walked off the edge)"),
+            (40270, "40,269 steps  (walked off the edge)"),
+        ):
+            with self.subTest(budget=budget):
+                panel, labels = self.capture_captions("ab", fonts, steps=budget)
+                self.assertEqual(labels[-1][0], expected)
+                l, t, r, b = labels[-1][1]
+                self.assertTrue(14 <= l <= r <= panel.width - 14)
+                self.assertTrue(452 <= t <= b <= panel.height)
 
     def test_long_caption_calls_fit_without_overlap(self):
         fonts = (ants.ImageFont.truetype("DejaVuSans.ttf", 30),
