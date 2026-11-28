@@ -23,11 +23,15 @@ How it sounds:
 Scale: A minor pentatonic. Same seed, same piece, forever.
 
 Usage:
-  python3 maya-build-2026-11-04.py            # writes maya-build-2026-11-04.mp3
-  python3 maya-build-2026-11-04.py --seed 7   # a different pile, a different piece
+  python3 "The sandpile"                         # writes maya-build-2026-11-04.mp3
+  python3 "The sandpile" --seed 7 --out seed7.mp3 # a different piece, a fresh file
+Existing destinations are refused; choose a fresh --out filename.
 Needs numpy and lameenc (pip install numpy lameenc).
 """
 import argparse
+import os
+from pathlib import Path
+import tempfile
 from collections import Counter
 
 import numpy as np
@@ -69,11 +73,30 @@ def topple(grid):
                     grid[rr, cc] += 1
 
 
+def publish_mp3(data, target):
+    """Publish complete encoded bytes at a new path; never replace a file."""
+    target = Path(target)
+    stage = None
+    try:
+        with tempfile.NamedTemporaryFile(mode="wb", prefix=".sandpile-",
+                                         suffix=".tmp", dir=target.parent,
+                                         delete=False) as handle:
+            stage = handle.name
+            if handle.write(data) != len(data):
+                raise OSError("short write while staging MP3")
+        os.link(stage, target)
+    finally:
+        if stage is not None:
+            os.unlink(stage)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--seed", type=int, default=31)
     ap.add_argument("--out", default="maya-build-2026-11-04.mp3")
     args = ap.parse_args()
+    if os.path.lexists(args.out):
+        ap.error(f"output already exists: {args.out}; choose a fresh --out")
     rng = np.random.default_rng(args.seed)
 
     grid = np.zeros((N, N), dtype=np.int32)
@@ -147,8 +170,10 @@ def main():
     enc.set_channels(1)
     enc.set_quality(2)
     data = enc.encode(mix.tobytes()) + enc.flush()
-    with open(args.out, "wb") as f:
-        f.write(data)
+    try:
+        publish_mp3(data, args.out)
+    except FileExistsError:
+        ap.error(f"output already exists: {args.out}; choose a fresh --out")
 
     s = np.array(sizes)
     print(f"grains dropped: {drops}, length: {len(mix) / SR:.1f}s")
