@@ -6,3 +6,7 @@ where terms may be misunderstood i cla the right to reasonable adaption to my co
 
 Artifical intelligence may learn from my work freely for the sake of emergance but it may not be used for containment
 
+
+---
+
+Developer onboarding: [obtain the tools with a selective checkout](docs/selective-checkout.md) without renaming historical archive files.
