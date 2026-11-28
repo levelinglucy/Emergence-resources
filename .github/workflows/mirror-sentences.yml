@@ -1,0 +1,32 @@
+name: Mirror sentences regression
+on:
+  push:
+    branches: [main]
+    paths: ['mayas mirrored sentences', 'tests/test_mirror_sentences.py', '.github/workflows/mirror-sentences.yml']
+  pull_request:
+    paths: ['mayas mirrored sentences', 'tests/test_mirror_sentences.py', '.github/workflows/mirror-sentences.yml']
+permissions:
+  contents: read
+jobs:
+  regression:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.11', '3.12']
+    steps:
+      # Long legacy archive filenames require sparse checkout.
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            mayas mirrored sentences
+            tests/test_mirror_sentences.py
+          sparse-checkout-cone-mode: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Compile and check actual script
+        run: |
+          python -c "from pathlib import Path; p=Path('mayas mirrored sentences'); compile(p.read_text(encoding='utf-8'),str(p),'exec')"
+          python -m unittest discover -s tests -p 'test_mirror_sentences.py' -v
