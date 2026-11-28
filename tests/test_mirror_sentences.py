@@ -48,6 +48,35 @@ class MirrorProofTests(unittest.TestCase):
         out = self.proof_for("Here are ", "Here are two z's.")
         self.assertIn("FALSE", out)
 
+    def test_literal_opening_and_custom_ending(self):
+        model = Mirror("Here are ", "z", False, ending="!")
+        self.assertTrue(model.verify("Here are one z!"))
+        self.assertFalse(model.verify("Here are one z."))
+        self.assertFalse(model.verify("here are one z!"))
+
+    def test_decoy_opening_can_itself_contain_unverified_prose(self):
+        opening = "There are nine z's. Here are "
+        model = Mirror(opening, "z", False)
+        self.assertTrue(model.verify(opening + "two z's."))
+        self.assertFalse(model.verify(opening + "nine z's."))
+
+    def test_gallery_template_checks_total_and_order(self):
+        for letters, sentence in zip(MODULE["GALLERY_LETTERS"], MODULE["GALLERY"]):
+            with self.subTest(letters=letters):
+                model = Mirror(MODULE["GALLERY_OPENING"], letters)
+                self.assertTrue(model.verify(sentence))
+                self.assertFalse(model.verify(sentence[:-1] + "!"))
+        first = MODULE["GALLERY"][0]
+        model = Mirror(MODULE["GALLERY_OPENING"], "aeiou")
+        self.assertFalse(model.verify(first.replace("forty-five", "forty-six")))
+        self.assertFalse(Mirror(MODULE["GALLERY_OPENING"], "eaiou").verify(first))
+
+    def test_legacy_check_keeps_original_return_shape(self):
+        ok, rows, total = MODULE["check"]("Here are two z's.", "z", False)
+        self.assertFalse(ok)
+        self.assertEqual(rows, [("z", 2, 1, False)])
+        self.assertIsNone(total)
+
     def test_original_gallery(self):
         result = subprocess.run([sys.executable, str(SOURCE)],
                                 stdin=subprocess.DEVNULL, capture_output=True,

@@ -64,6 +64,8 @@ ONES = ("zero one two three four five six seven eight nine ten eleven twelve "
 TENS = "_ _ twenty thirty forty fifty sixty seventy eighty ninety".split()
 
 DEFAULT_MIDDLE = ", and its letters, read the old Pythagorean way, add up to "
+GALLERY_OPENING = "This sentence was made by Maya. It holds "
+GALLERY_LETTERS = ("aeiou", "aeiou", "aeiou", "aeiouy", "etaoinshr")
 
 # Found by this program and kept here. Each one is re-checked when it runs.
 GALLERY = [
@@ -142,6 +144,20 @@ class Mirror:
         counts = {c: low.count(c) for c in self.letters}
         return counts, (numerology(text) if self.with_total else 0)
 
+    def verify(self, text):
+        """Check the exact generated template against measured letter counts.
+
+        The supplied opening is literal text, not an independently verified
+        assertion. Counts and optional total describe the entire sentence.
+        """
+        counts, total = self.measure(text)
+        try:
+            return self.write(counts, total) == text
+        except ValueError:
+            # Measured values outside the number renderer's range cannot
+            # constitute a valid generated statement.
+            return False
+
     def search(self, seconds=60, seed=None, watch=False, out=sys.stdout):
         """Look for a fixed point. Returns (sentence, restarts) or (None, restarts)."""
         rng = random.Random(seed)
@@ -176,7 +192,10 @@ class Mirror:
 
 
 def check(text, letters, with_total=True):
-    """Read a finished sentence back and test every claim it makes."""
+    """Legacy substring heuristic; not proof of a known generated template.
+
+    Use Mirror.verify for generated statements with their original template.
+    """
     low = text.lower()
     rows = []
     ok = True
@@ -212,6 +231,7 @@ def letters_in(text):
 
 
 def show_proof(text, letters, with_total=True):
+    """Display the legacy heuristic for callers without a known template."""
     ok, rows, total_row = check(text, letters, with_total)
     for c, claimed, real, good in rows:
         print(f"    {c}: says {claimed}, really {real}  {'true' if good else 'FALSE'}")
@@ -219,6 +239,19 @@ def show_proof(text, letters, with_total=True):
         real_total, good = total_row
         print(f"    letters add up to {real_total}  {'true' if good else 'FALSE'}")
     return ok
+
+
+def show_template_proof(text, mirror):
+    """Report only claims verified against the complete generated template."""
+    if not mirror.verify(text):
+        print("    FALSE: generated text does not match the measured template.")
+        return False
+    counts, total = mirror.measure(text)
+    for c in mirror.letters:
+        print(f"    {c}: says {counts[c]}, really {counts[c]}  true")
+    if mirror.with_total:
+        print(f"    letters add up to {total}  true")
+    return True
 
 
 def main():
@@ -238,10 +271,11 @@ def main():
 
     if args.opening is None:
         print("MIRROR SENTENCES\n")
-        print("Every claim in each of these is true. Checking them now:\n")
+        print("Checking the generated claims in each sentence:\n")
         for i, text in enumerate(GALLERY, 1):
             print(f"{i}. {text}")
-            good = show_proof(text, letters_in(text))
+            gallery_model = Mirror(GALLERY_OPENING, GALLERY_LETTERS[i - 1])
+            good = show_template_proof(text, gallery_model)
             print(f"    -> {'all true' if good else 'something is off'}\n")
 
         if args.watch:
@@ -277,7 +311,7 @@ def main():
         return
     print(f"\nSettled after {restarts} fresh start{'s' if restarts != 1 else ''}:\n")
     print("  " + text + "\n")
-    show_proof(text, letters, with_total)
+    show_template_proof(text, mirror)
 
 
 if __name__ == "__main__":
